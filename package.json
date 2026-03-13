@@ -1,0 +1,11 @@
+{
+  "name": "@scholars-attendant/paper-collector",
+  "version": "1.0.0",
+  "description": "OpenClaw plugin: auto-detect research paper URLs and save structured metadata to Notion",
+  "private": true,
+  "type": "module",
+  "openclaw": {
+    "extensions": ["./index.ts"]
+  },
+  "license": "MIT"
+}

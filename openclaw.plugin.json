@@ -1,0 +1,30 @@
+{
+  "id": "paper-collector",
+  "name": "Paper Collector",
+  "description": "Auto-detect research/paper URLs in messages, extract metadata, and save to a Notion database.",
+  "skills": ["./skills"],
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "databaseId": {
+        "type": "string",
+        "description": "Notion database ID to save papers to."
+      },
+      "parentPageId": {
+        "type": "string",
+        "description": "Notion page ID under which to create the database (used by notion_setup)."
+      }
+    }
+  },
+  "uiHints": {
+    "databaseId": {
+      "label": "Notion Database ID",
+      "help": "The ID of the Notion database where papers are saved."
+    },
+    "parentPageId": {
+      "label": "Parent Page ID",
+      "help": "The Notion page under which the database is created during setup."
+    }
+  }
+}
