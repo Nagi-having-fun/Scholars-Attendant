@@ -1,6 +1,6 @@
 ---
 name: paper-collector
-description: "MUST USE when the user sends any URL (arXiv, Xiaohongshu, WeChat, X/Twitter, GitHub, blog, etc.). Fetches content, detects if research/paper-related, extracts metadata, and saves to Notion via notion_save_paper. Always read this skill before responding to messages containing URLs."
+description: "MUST USE when the user sends any URL (arXiv, Xiaohongshu, WeChat, X/Twitter, GitHub, blog, etc.). Fetches content, detects if research/paper-related, extracts metadata (including from images when text is insufficient), and saves to Notion via notion_save_paper. Always read this skill before responding to messages containing URLs."
 ---
 
 # Paper Collector
@@ -40,7 +40,7 @@ Use `web_fetch` to retrieve the page content from the URL. NEVER use exec/curl/w
 - **Sufficient text**: The page returned paper title, authors, abstract, or a clear discussion of a specific paper → proceed to Step 2.
 - **Insufficient text / blocked / login page / anti-scraping**: The page returned very little text, an error, a login wall, or content appears to be in images → **you MUST go to Step 1b**. Do NOT give up. Do NOT ask the user to paste content.
 
-This applies to ALL platforms. Many platforms (Xiaohongshu, WeChat, X) will block `web_fetch`. This is expected — always fall back to the `browser` tool.
+This applies to ALL platforms. Many platforms (Xiaohongshu, WeChat, X) will block `web_fetch`. This is expected — always fall back.
 
 ### Step 1b: Visual extraction (MANDATORY when text is insufficient)
 
@@ -59,9 +59,70 @@ When `web_fetch` did not return enough useful content:
 5. Combine information from text (Step 1) and screenshots (Step 1b).
 6. If the browser also fails, use `web_search` with any keywords from the URL (domain, path segments, query params) to find the paper.
 
+### Step 1c: Image-based paper inference (MANDATORY when no paper title/link found)
+
+**CRITICAL: If after Step 1 and Step 1b you still do NOT have a clear paper title or paper link, you MUST attempt image-based inference. Do NOT skip this step. Do NOT give up.**
+
+This step handles the common case where social media posts (Xiaohongshu, WeChat, X) discuss a paper primarily through images — paper screenshots, architecture diagrams, figure reproductions, slides — rather than text.
+
+#### Strategy A: Extract images from HTML
+
+1. If `web_fetch` returned HTML content (even if text was sparse), call `extract_page_images` with the raw HTML and the page URL as `base_url`.
+2. The tool returns a ranked list of image URLs (og:image first, then content images).
+3. Use `web_fetch` on the top image URLs (start with og:image and the first 3-5 content images) to **view them visually**.
+4. In each image, look for:
+   - **Paper title** (often visible in screenshots of the paper's first page or in slide headers)
+   - **arXiv ID** (e.g., `arXiv:2301.12345` printed on the paper)
+   - **Author names** (visible on paper headers)
+   - **Architecture/method diagrams** with a named method (e.g., "DiT", "Mamba", "RLHF")
+   - **Figure captions** that reference a paper or method name
+   - **Conference/journal logos** (NeurIPS, ICML badge, etc.)
+   - **DOI** or URL printed on the image
+   - **Table headers** with benchmark/dataset names
+   - **Chinese text** that translates or refers to a paper title
+
+#### Strategy B: Browser screenshots of images
+
+If Strategy A doesn't yield enough clues (images blocked, or `extract_page_images` found nothing):
+
+1. Use `browser` to navigate to the URL
+2. Take screenshots while scrolling through the entire post
+3. Focus on each embedded image — zoom in if needed: `browser action=click` on images to view full-size
+4. Apply the same visual analysis as Strategy A
+
+#### Strategy C: Reverse-image reasoning
+
+From whatever visual clues you gathered (even partial), construct search queries:
+
+1. **Method/model name spotted** (e.g., "FlashAttention", "LLaVA", diagram labeled "our method"):
+   → `web_search` for `"<method name>" paper arxiv`
+2. **Architecture diagram style recognized** (e.g., Transformer blocks, diffusion pipeline):
+   → combine with any visible text/keywords to search
+3. **Figure number + caption fragments** (e.g., "Figure 3: Comparison of..."):
+   → search for the caption text
+4. **Chinese title/summary visible in image**:
+   → translate to English, then search for the English paper title
+5. **Author names visible** (even partial):
+   → `web_search` for `"<author name>" <topic keywords> paper 2024`
+6. **Conference badge/watermark** (e.g., "Accepted at ICLR 2025"):
+   → narrow search by conference: `"<any keyword>" ICLR 2025 paper`
+7. **Benchmark results table visible** with specific numbers:
+   → search for the dataset name + task + approximate scores
+
+#### Combining clues
+
+You often won't get the full paper title from a single image. Combine clues across multiple images and any text fragments:
+
+- Image 1 shows an architecture diagram labeled "X-Former"
+- Image 2 shows a results table on ImageNet
+- Post text mentions "SOTA performance"
+- → search: `"X-Former" ImageNet paper arxiv`
+
+**Keep searching until you find the paper or exhaust all clues. Try at least 3 different search queries before concluding the paper cannot be identified.**
+
 ### Step 2: Evaluate relevance
 
-From whatever content you gathered (text + visual), determine if this is about a specific research paper. Look for:
+From whatever content you gathered (text + visual + image inference), determine if this is about a specific research paper. Look for:
 - Paper title, author names, abstract
 - arXiv IDs (e.g., `2301.12345`)
 - DOI references
@@ -105,6 +166,8 @@ Call `notion_save_paper` with the extracted metadata.
 
 Brief confirmation with the paper title, authors, one-line summary, and Notion link.
 
+If the paper was identified through image inference, also mention how it was found (e.g., "Identified from architecture diagram in image 2").
+
 ## Language Handling
 
 - Extract the **original English paper title** whenever possible
@@ -120,3 +183,6 @@ Brief confirmation with the paper title, authors, one-line summary, and Notion l
 - **Social media threads**: Use the main post URL as source_url
 - **Browser not available**: Work with whatever text `web_fetch` returned and use `web_search` to find the paper by any keywords you can identify
 - **Cannot find original paper**: Save with whatever metadata you have; leave paper_url empty and note in summary that the original paper could not be located
+- **Images are blurry or low-resolution**: Extract whatever partial text is visible, use it as search keywords
+- **Multiple candidate papers from image clues**: Use `web_search` to verify which paper matches the visual content, then pick the best match
+- **Image shows a figure from a survey/review paper**: Check if the post discusses the specific cited paper or the survey itself

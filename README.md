@@ -2,6 +2,14 @@
 
 An [OpenClaw](https://github.com/openclaw/openclaw) plugin that automatically detects research paper URLs from various platforms and saves structured metadata to a Notion database.
 
+## Features
+
+- **Multi-platform URL detection**: Supports arXiv, Xiaohongshu, WeChat, X/Twitter, GitHub, and more
+- **Image-based paper inference**: When a page lacks text-based paper info (common on social media), the plugin analyzes images — paper screenshots, architecture diagrams, figure reproductions — to identify and search for the paper
+- **Structured metadata extraction**: Title, authors, institution, summary, contributions, tags
+- **Notion integration**: Auto-saves to a Notion database with deduplication
+- **Multi-language support**: Handles Chinese/English content, always extracts English paper titles
+
 ## Supported Platforms
 
 - arXiv
@@ -16,10 +24,27 @@ An [OpenClaw](https://github.com/openclaw/openclaw) plugin that automatically de
 ## How It Works
 
 1. User sends a URL in a message
-2. Plugin fetches and evaluates the content
-3. If research-related, extracts metadata (title, authors, institution, summary, tags, etc.)
-4. Saves structured entry to a Notion database
-5. Deduplicates by source URL
+2. Plugin fetches and evaluates the content via `web_fetch`
+3. If text content is insufficient (blocked by anti-scraping, login walls, etc.):
+   - Falls back to browser screenshots
+   - **Extracts and analyzes page images** (og:image, embedded figures, etc.) to identify paper clues
+   - Uses visual clues (paper titles in screenshots, architecture diagrams, figure captions, arXiv IDs) to search for the paper
+4. Extracts structured metadata (title, authors, institution, summary, tags, etc.)
+5. Saves to Notion database with duplicate checking
+
+### Image-Based Inference Flow
+
+Many social media posts (Xiaohongshu, WeChat, X) discuss papers primarily through images rather than text. The plugin handles this by:
+
+1. **Extracting images** from HTML via `extract_page_images` tool (parses `og:image`, `<img src>`, `data-src`)
+2. **Visually analyzing** each image for paper identifiers:
+   - Paper titles visible in screenshots
+   - arXiv IDs (e.g., `arXiv:2301.12345`)
+   - Architecture/method names in diagrams
+   - Author names, conference badges, DOIs
+   - Figure captions and table headers
+3. **Searching** with extracted clues via `web_search`
+4. **Verifying** by fetching the actual paper page for accurate metadata
 
 ## Setup
 
@@ -50,6 +75,14 @@ Use the `notion_setup` tool with a `parent_page_id` to create the Paper Collecti
 
 Add this plugin to your OpenClaw configuration and set the `databaseId` in the plugin config.
 
+## Tools
+
+| Tool | Description |
+|------|-------------|
+| `notion_save_paper` | Save a paper's structured metadata to the Notion database |
+| `notion_setup` | One-time setup: create the Paper Collection database in Notion |
+| `extract_page_images` | Extract image URLs from HTML for visual paper identification |
+
 ## Notion Database Schema
 
 | Property      | Type         | Description                          |
@@ -75,10 +108,11 @@ Add this plugin to your OpenClaw configuration and set the `databaseId` in the p
 │   ├── config.ts             # Configuration parser
 │   ├── types.ts              # TypeScript type definitions
 │   ├── notion-client.ts      # Notion API client
-│   └── notion-tools.ts       # Tool definitions (save_paper, setup)
+│   ├── notion-tools.ts       # Tool definitions (save_paper, setup, extract_images)
+│   └── image-extract.ts      # HTML image URL extraction utilities
 └── skills/
     └── paper-collector/
-        └── SKILL.md           # AI skill definition for URL handling
+        └── SKILL.md           # AI skill definition for URL handling & image inference
 ```
 
 ## License

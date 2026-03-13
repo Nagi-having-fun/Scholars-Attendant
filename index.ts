@@ -1,7 +1,11 @@
 import fs from "node:fs";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
 import { parseConfig } from "./src/config.js";
-import { createNotionSavePaperTool, createNotionSetupTool } from "./src/notion-tools.js";
+import {
+  createNotionSavePaperTool,
+  createNotionSetupTool,
+  createExtractPageImagesTool,
+} from "./src/notion-tools.js";
 
 function resolveNotionToken(): string {
   const keyFile = process.env.NOTION_API_TOKEN_FILE;
@@ -31,6 +35,7 @@ const plugin = {
 
     api.registerTool(createNotionSavePaperTool({ config, notionToken, logger }));
     api.registerTool(createNotionSetupTool({ config, notionToken, logger }));
+    api.registerTool(createExtractPageImagesTool({ logger }));
 
     logger.info(
       `Paper collector active: databaseId=${config.databaseId || "(not set)"}`,

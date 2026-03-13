@@ -1,5 +1,6 @@
 import type { PaperCollectorConfig, PaperMetadata } from "./types.js";
 import { createDatabase, findBySourceUrl, savePaperToNotion } from "./notion-client.js";
+import { extractImagesFromHtml } from "./image-extract.js";
 
 const NotionSavePaperSchema = {
   type: "object" as const,
@@ -256,6 +257,107 @@ export function createNotionSetupTool(params: {
           ],
         };
       }
+    },
+  };
+}
+
+// --- Image extraction tool ---
+
+const ExtractPageImagesSchema = {
+  type: "object" as const,
+  additionalProperties: false,
+  required: ["html"],
+  properties: {
+    html: {
+      type: "string" as const,
+      description:
+        "Raw HTML content from web_fetch. The tool extracts image URLs from it.",
+    },
+    base_url: {
+      type: "string" as const,
+      description: "Base URL for resolving relative image paths.",
+    },
+    limit: {
+      type: "number" as const,
+      description: "Max images to return (default 10).",
+    },
+  },
+};
+
+export function createExtractPageImagesTool(params: {
+  logger: {
+    info: (msg: string) => void;
+    warn: (msg: string) => void;
+    error: (msg: string) => void;
+  };
+}) {
+  const { logger } = params;
+
+  return {
+    name: "extract_page_images",
+    label: "Extract Images from Page",
+    description:
+      "Extract image URLs (og:image, img src, data-src) from HTML returned by web_fetch. " +
+      "Use this when a page lacks paper title/link in text but may contain paper " +
+      "figures, architecture diagrams, or screenshots that can identify the paper. " +
+      "Returns image URLs that you can then view with web_fetch or browser to " +
+      "visually identify the paper.",
+    parameters: ExtractPageImagesSchema,
+    execute: async (_toolCallId: string, rawParams: Record<string, unknown>) => {
+      const html = rawParams.html as string;
+      if (!html || html.length < 10) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: "Error: No HTML content provided or content is too short.",
+            },
+          ],
+        };
+      }
+
+      const limit =
+        typeof rawParams.limit === "number" ? rawParams.limit : undefined;
+      const baseUrl =
+        typeof rawParams.base_url === "string" ? rawParams.base_url : undefined;
+
+      const images = extractImagesFromHtml(html, { limit, baseUrl });
+
+      if (images.length === 0) {
+        logger.info("No content images found in HTML");
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text:
+                "No content images found in the HTML. " +
+                "Try using the browser tool to take screenshots of the page instead.",
+            },
+          ],
+        };
+      }
+
+      logger.info(`Extracted ${images.length} images from HTML`);
+
+      const lines = images.map((img, i) => {
+        const parts = [`[${i + 1}] ${img.url}`, `    source: ${img.source}`];
+        if (img.alt) parts.push(`    alt: ${img.alt}`);
+        return parts.join("\n");
+      });
+
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text:
+              `Found ${images.length} image(s):\n\n${lines.join("\n\n")}\n\n` +
+              "Next steps:\n" +
+              "1. Use web_fetch on the image URLs to view them (especially og:image and the first few content images)\n" +
+              "2. Look for: paper titles, author names, arXiv IDs, architecture diagrams, figure captions, method names\n" +
+              "3. Use any identified keywords to web_search for the paper",
+          },
+        ],
+      };
     },
   };
 }
