@@ -6,7 +6,7 @@ export type PaperCollectorConfig = {
 export type PaperMetadata = {
   title: string;
   authors: string;
-  institution: string;
+  institutions: string[];
   publishedDate: string;
   sourceUrl: string;
   paperUrl: string;

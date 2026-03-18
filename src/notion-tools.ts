@@ -9,7 +9,12 @@ const NotionSavePaperSchema = {
   properties: {
     title: { type: "string" as const, description: "Paper title." },
     authors: { type: "string" as const, description: "Comma-separated author names." },
-    institution: { type: "string" as const, description: "Primary institution/affiliation." },
+    institutions: {
+      type: "array" as const,
+      items: { type: "string" as const },
+      description:
+        "Institution tags for first author and corresponding author (e.g., [\"MIT\", \"Stanford\"]). Use short, standard names.",
+    },
     published_date: {
       type: "string" as const,
       description: "Publication date in ISO 8601 format (YYYY-MM-DD).",
@@ -121,7 +126,7 @@ export function createNotionSavePaperTool(params: {
       const paper: PaperMetadata = {
         title: rawParams.title as string,
         authors: rawParams.authors as string,
-        institution: (rawParams.institution as string) ?? "",
+        institutions: Array.isArray(rawParams.institutions) ? rawParams.institutions.map(String) : [],
         publishedDate: (rawParams.published_date as string) ?? "",
         sourceUrl,
         paperUrl: (rawParams.paper_url as string) ?? "",

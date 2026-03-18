@@ -150,7 +150,7 @@ Combine information from the original source AND the paper's actual page:
 
 - **title**: The paper's actual English title
 - **authors**: Author names from the paper page, comma-separated
-- **institution**: Primary institution(s) if identifiable
+- **institutions**: An array of institution tags for the **first author** and **corresponding author** (last author or marked with *). Use short, standard abbreviations (e.g., "MIT", "Stanford", "ETH Zurich", "Tsinghua University", "CMU", "UIUC", "UC Berkeley"). If the same institution applies to both, include it only once.
 - **published_date**: In YYYY-MM-DD format if available
 - **source_url**: The original URL the user sent
 - **paper_url**: Direct link to the paper itself (arXiv abs page, DOI URL, etc.)

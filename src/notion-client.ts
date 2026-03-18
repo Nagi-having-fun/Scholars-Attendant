@@ -28,7 +28,7 @@ export async function createDatabase(params: {
     properties: {
       Title: { title: {} },
       Authors: { rich_text: {} },
-      Institution: { rich_text: {} },
+      Institution: { multi_select: {} },
       Published: { date: {} },
       "Source URL": { url: {} },
       "Paper URL": { url: {} },
@@ -78,7 +78,7 @@ export async function savePaperToNotion(params: {
       rich_text: [{ type: "text", text: { content: truncate(paper.authors) } }],
     },
     Institution: {
-      rich_text: [{ type: "text", text: { content: truncate(paper.institution) } }],
+      multi_select: paper.institutions.slice(0, 10).map((i) => ({ name: i.slice(0, 100) })),
     },
     "Source URL": { url: paper.sourceUrl || null },
     "Paper URL": { url: paper.paperUrl || null },
