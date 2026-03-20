@@ -168,6 +168,15 @@ Brief confirmation with the paper title, authors, one-line summary, and Notion l
 
 If the paper was identified through image inference, also mention how it was found (e.g., "Identified from architecture diagram in image 2").
 
+### Step 7: Offer additional actions
+
+After saving metadata, offer the user these follow-up actions:
+
+- **"Want a detailed summary?"** → Use `alphaxiv-lookup` for a structured overview
+- **"Want to see the equations/tables?"** → Use `paper-parse` to extract formatted math and tables
+- **"Save figures?"** → Use `paper-figures` to extract and list all paper figures
+- **"Create a full Notion blog page?"** → Use `paper-to-notion` to create a richly formatted Notion page with equations, figures, and hyperlinked references
+
 ## Language Handling
 
 - Extract the **original English paper title** whenever possible
