@@ -1,14 +1,47 @@
 # Scholars-Attendant (Paper Collector)
 
-An [OpenClaw](https://github.com/openclaw/openclaw) plugin that automatically detects research paper URLs from various platforms and saves structured metadata to a Notion database.
+An [OpenClaw](https://github.com/openclaw/openclaw) plugin that automatically detects research paper URLs, extracts structured metadata, and provides a full paper analysis pipeline — from quick saves to richly formatted Notion blog pages.
 
 ## Features
 
 - **Multi-platform URL detection**: Supports arXiv, Xiaohongshu, WeChat, X/Twitter, GitHub, and more
 - **Image-based paper inference**: When a page lacks text-based paper info (common on social media), the plugin analyzes images — paper screenshots, architecture diagrams, figure reproductions — to identify and search for the paper
-- **Structured metadata extraction**: Title, authors, institution, summary, contributions, tags
+- **Structured metadata extraction**: Title, authors, institutions (multi-select tags), summary, contributions, tags
+- **AlphaXiv integration**: Fetch AI-generated structured overviews for arXiv papers — faster and more reliable than reading raw PDFs
+- **Formula & table parsing**: Extract equations with correct LaTeX formatting and numbering, plus tables with proper structure
+- **Figure extraction**: Collect paper figures with captions from arXiv HTML, PDF screenshots, or other sources
+- **Blog-style Notion pages**: Convert papers into richly formatted Notion pages with KaTeX equations, embedded figures, hyperlinked references, and toggle sections — modeled after [Lilian Weng's blog](https://lilianweng.github.io/)
 - **Notion integration**: Auto-saves to a Notion database with deduplication
 - **Multi-language support**: Handles Chinese/English content, always extracts English paper titles
+
+## Skills
+
+The plugin provides 5 AI skills that work together as a paper analysis pipeline:
+
+| Skill | Description |
+|-------|-------------|
+| **paper-collector** | Core workflow: detect paper URLs, extract metadata, save to Notion. Triggers automatically on URLs. |
+| **alphaxiv-lookup** | Fetch structured AI-generated paper overviews from alphaxiv.org. Preferred first step before parsing PDFs. |
+| **paper-parse** | Extract formulas, symbols, and tables with correct LaTeX formatting and numbering. Two methods: PDF text extraction and image-based visual parsing. |
+| **paper-figures** | Extract and save paper figures with captions. Sources: arXiv HTML, PDF browser screenshots, Semantic Scholar. |
+| **paper-to-notion** | Convert a paper into a blog-style Notion page with KaTeX equations, embedded figures, Notion tables, hyperlinked citations, toggle proofs, and callout highlights. |
+
+### Typical Workflow
+
+```
+User sends a paper URL
+        │
+        ▼
+  paper-collector          ← Auto-detect, extract metadata, save to Notion DB
+        │
+        ▼ (follow-up actions)
+        │
+   ┌────┼────────────┬──────────────┐
+   ▼    ▼            ▼              ▼
+alphaxiv  paper-parse  paper-figures  paper-to-notion
+ lookup   (equations    (save figs)   (full blog page
+(summary)  & tables)                   in Notion)
+```
 
 ## Supported Platforms
 
@@ -29,8 +62,9 @@ An [OpenClaw](https://github.com/openclaw/openclaw) plugin that automatically de
    - Falls back to browser screenshots
    - **Extracts and analyzes page images** (og:image, embedded figures, etc.) to identify paper clues
    - Uses visual clues (paper titles in screenshots, architecture diagrams, figure captions, arXiv IDs) to search for the paper
-4. Extracts structured metadata (title, authors, institution, summary, tags, etc.)
+4. Extracts structured metadata (title, authors, institutions, summary, tags, etc.)
 5. Saves to Notion database with duplicate checking
+6. Offers follow-up actions: summary, equation extraction, figure saving, or full blog-style Notion page
 
 ### Image-Based Inference Flow
 
@@ -46,6 +80,20 @@ Many social media posts (Xiaohongshu, WeChat, X) discuss papers primarily throug
 3. **Searching** with extracted clues via `web_search`
 4. **Verifying** by fetching the actual paper page for accurate metadata
 
+### Paper-to-Notion Blog Format
+
+The `paper-to-notion` skill creates Notion pages with:
+
+- **Table of Contents** for navigation
+- **TL;DR** — one-sentence key contribution
+- **Background** — context and motivation with notation
+- **Method** — detailed methodology with numbered equations and architecture figures
+- **Experiments** — results tables and analysis
+- **Key Takeaways** — bulleted summary
+- **References** — numbered list with hyperlinks to arXiv/DOI
+- **Toggle sections** for lengthy proofs and derivations
+- **Callout blocks** for key insights and warnings
+
 ## Setup
 
 ### 1. Create a Notion Integration
@@ -57,14 +105,13 @@ Many social media posts (Xiaohongshu, WeChat, X) discuss papers primarily throug
 ### 2. Configure Environment
 
 ```bash
-cp .env.example .env
-# Edit .env and add your Notion token
+export NOTION_API_TOKEN=your_token_here
 ```
 
-Or set the environment variable directly:
+Or for Docker deployments, add to your `.env`:
 
 ```bash
-export NOTION_API_TOKEN=your_token_here
+NOTION_API_TOKEN=ntn_your_token_here
 ```
 
 ### 3. Create the Database
@@ -85,18 +132,18 @@ Add this plugin to your OpenClaw configuration and set the `databaseId` in the p
 
 ## Notion Database Schema
 
-| Property      | Type         | Description                          |
-|---------------|--------------|--------------------------------------|
-| Title         | Title        | Paper title                          |
-| Authors       | Rich Text    | Comma-separated author names         |
-| Institution   | Rich Text    | Primary institution/affiliation      |
-| Published     | Date         | Publication date                     |
-| Source URL    | URL          | Original URL shared by user          |
-| Paper URL     | URL          | Direct link to paper (arXiv, DOI)    |
-| Summary       | Rich Text    | One-sentence summary                 |
-| Contributions | Rich Text    | Main contributions (2-3 sentences)   |
-| Tags          | Multi-select | Research area tags (English)         |
-| Status        | Select       | Unread / Reading / Read              |
+| Property      | Type         | Description                                    |
+|---------------|--------------|------------------------------------------------|
+| Title         | Title        | Paper title                                    |
+| Authors       | Rich Text    | Comma-separated author names                   |
+| Institution   | Multi-select | First author & corresponding author affiliations (e.g., MIT, Stanford) |
+| Published     | Date         | Publication date                               |
+| Source URL    | URL          | Original URL shared by user                    |
+| Paper URL     | URL          | Direct link to paper (arXiv, DOI)              |
+| Summary       | Rich Text    | One-sentence summary                           |
+| Contributions | Rich Text    | Main contributions (2-3 sentences)             |
+| Tags          | Multi-select | Research area tags (English)                   |
+| Status        | Select       | Unread / Reading / Read                        |
 
 ## Project Structure
 
@@ -111,8 +158,11 @@ Add this plugin to your OpenClaw configuration and set the `databaseId` in the p
 │   ├── notion-tools.ts       # Tool definitions (save_paper, setup, extract_images)
 │   └── image-extract.ts      # HTML image URL extraction utilities
 └── skills/
-    └── paper-collector/
-        └── SKILL.md           # AI skill definition for URL handling & image inference
+    ├── paper-collector/      # Core: URL detection, metadata extraction, Notion save
+    ├── alphaxiv-lookup/      # AlphaXiv structured paper overview
+    ├── paper-parse/          # Formula, symbol & table extraction
+    ├── paper-figures/        # Figure extraction & saving
+    └── paper-to-notion/      # Blog-style Notion page generation
 ```
 
 ## License
