@@ -1,6 +1,14 @@
 import type { PaperCollectorConfig, PaperMetadata } from "./types.js";
-import { createDatabase, findBySourceUrl, savePaperToNotion } from "./notion-client.js";
+import {
+  createDatabase,
+  findBySourceUrl,
+  savePaperToNotion,
+  clearPageContent,
+  appendBlocks,
+  createChildPage,
+} from "./notion-client.js";
 import { extractImagesFromHtml } from "./image-extract.js";
+import { markdownToBlocks } from "./markdown-to-blocks.js";
 
 const NotionSavePaperSchema = {
   type: "object" as const,
@@ -363,6 +371,213 @@ export function createExtractPageImagesTool(params: {
           },
         ],
       };
+    },
+  };
+}
+
+// --- Page content writing tools ---
+
+const NotionWritePageSchema = {
+  type: "object" as const,
+  additionalProperties: false,
+  required: ["page_id", "markdown"],
+  properties: {
+    page_id: {
+      type: "string" as const,
+      description:
+        "Notion page ID to write content to (the 32-char hex ID from the page URL).",
+    },
+    markdown: {
+      type: "string" as const,
+      description:
+        "Page content in Notion-flavored Markdown. Supports: headings (#/##/###), " +
+        "bold (**), italic (*), inline math ($...$), block equations ($$...$$), " +
+        "images (![caption](url)), tables (<table>), callouts (<callout>), " +
+        "bulleted/numbered lists, dividers (---), and <table_of_contents/>.",
+    },
+    clear_existing: {
+      type: "boolean" as const,
+      description: "If true, clear existing page content before writing. Default: true.",
+    },
+  },
+};
+
+export function createNotionWritePageTool(params: {
+  notionToken: string;
+  logger: {
+    info: (msg: string) => void;
+    warn: (msg: string) => void;
+    error: (msg: string) => void;
+  };
+}) {
+  const { notionToken, logger } = params;
+
+  return {
+    name: "notion_write_page",
+    label: "Write Page Content to Notion",
+    description:
+      "Write rich content (blog-style summary with headings, equations, figures, tables) " +
+      "to an existing Notion page using Notion-flavored Markdown. " +
+      "Use after notion_save_paper to add a detailed paper summary to the saved page.",
+    parameters: NotionWritePageSchema,
+    execute: async (_toolCallId: string, rawParams: Record<string, unknown>) => {
+      if (!notionToken) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: "Error: NOTION_API_TOKEN not configured.",
+            },
+          ],
+        };
+      }
+
+      const pageId = rawParams.page_id as string;
+      const markdown = rawParams.markdown as string;
+      const clearExisting = rawParams.clear_existing !== false; // default true
+
+      try {
+        // Clear existing content if requested
+        if (clearExisting) {
+          await clearPageContent({ token: notionToken, pageId });
+        }
+
+        // Convert markdown to blocks
+        const blocks = markdownToBlocks(markdown);
+
+        if (blocks.length === 0) {
+          return {
+            content: [
+              { type: "text" as const, text: "Warning: No content blocks generated from the provided markdown." },
+            ],
+          };
+        }
+
+        // Append blocks to page
+        await appendBlocks({ token: notionToken, pageId, blocks });
+
+        logger.info(`Wrote ${blocks.length} blocks to page ${pageId}`);
+
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `Successfully wrote ${blocks.length} content blocks to Notion page.\nPage: https://www.notion.so/${pageId.replace(/-/g, "")}`,
+            },
+          ],
+        };
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        logger.error(`Failed to write page content: ${msg}`);
+        return {
+          content: [
+            { type: "text" as const, text: `Failed to write page content: ${msg}` },
+          ],
+        };
+      }
+    },
+  };
+}
+
+const NotionCreateChildPageSchema = {
+  type: "object" as const,
+  additionalProperties: false,
+  required: ["parent_page_id", "title", "markdown"],
+  properties: {
+    parent_page_id: {
+      type: "string" as const,
+      description: "Parent Notion page ID under which to create the child page.",
+    },
+    title: {
+      type: "string" as const,
+      description: "Title of the child page.",
+    },
+    icon: {
+      type: "string" as const,
+      description: "Emoji icon for the page (e.g., '🇨🇳'). Optional.",
+    },
+    markdown: {
+      type: "string" as const,
+      description:
+        "Page content in Notion-flavored Markdown (same format as notion_write_page).",
+    },
+  },
+};
+
+export function createNotionCreateChildPageTool(params: {
+  notionToken: string;
+  logger: {
+    info: (msg: string) => void;
+    warn: (msg: string) => void;
+    error: (msg: string) => void;
+  };
+}) {
+  const { notionToken, logger } = params;
+
+  return {
+    name: "notion_create_child_page",
+    label: "Create Child Page in Notion",
+    description:
+      "Create a child page under an existing Notion page with rich Markdown content. " +
+      "Use this to create the Chinese translation sub-page after writing the English blog summary.",
+    parameters: NotionCreateChildPageSchema,
+    execute: async (_toolCallId: string, rawParams: Record<string, unknown>) => {
+      if (!notionToken) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: "Error: NOTION_API_TOKEN not configured.",
+            },
+          ],
+        };
+      }
+
+      const parentPageId = rawParams.parent_page_id as string;
+      const title = rawParams.title as string;
+      const icon = rawParams.icon as string | undefined;
+      const markdown = rawParams.markdown as string;
+
+      try {
+        // Create the child page
+        const page = await createChildPage({
+          token: notionToken,
+          parentPageId,
+          title,
+          icon,
+        });
+
+        // Convert and append content
+        const blocks = markdownToBlocks(markdown);
+        if (blocks.length > 0) {
+          await appendBlocks({ token: notionToken, pageId: page.pageId, blocks });
+        }
+
+        logger.info(
+          `Created child page "${title}" (${blocks.length} blocks) under ${parentPageId}`,
+        );
+
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text:
+                `Child page created successfully.\n` +
+                `Title: ${title}\n` +
+                `Blocks: ${blocks.length}\n` +
+                `URL: ${page.url}`,
+            },
+          ],
+        };
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        logger.error(`Failed to create child page: ${msg}`);
+        return {
+          content: [
+            { type: "text" as const, text: `Failed to create child page: ${msg}` },
+          ],
+        };
+      }
     },
   };
 }

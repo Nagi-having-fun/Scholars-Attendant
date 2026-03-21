@@ -230,18 +230,28 @@ For each citation in the paper:
 
 ### Step 5: Create the English Notion page
 
-Use `update-page` with `replace_content` to write the blog-style content into the paper's database entry page. The English version is always the **main page content**.
+Use the `notion_write_page` tool to write the blog-style content into the paper's database entry page. Pass the page ID returned by `notion_save_paper` and the full Markdown content.
 
-If the database entry doesn't exist yet, create it first via `notion_save_paper`, then add the blog page as content using `update-page` with `replace_content`.
+```
+notion_write_page(page_id="<page_id>", markdown="<full blog content>", clear_existing=true)
+```
+
+If the database entry doesn't exist yet, create it first via `notion_save_paper`, then use `notion_write_page` with the returned page ID.
 
 ### Step 6: Create the Chinese sub-page
 
 **MANDATORY**: After creating the English page, create a **Chinese translation sub-page** as a child of the main page:
 
-1. Use `create-pages` with `parent: { page_id: "<paper_page_id>" }`
-2. Title format: `中文摘要 — {Paper Title in Chinese}`
-3. Icon: 🇨🇳
-4. Content: A **complete Chinese translation** of the English blog page — same structure, same figures, same tables, same equations, but all prose translated to Chinese
+```
+notion_create_child_page(
+  parent_page_id="<page_id>",
+  title="中文摘要 — {Paper Title in Chinese}",
+  icon="🇨🇳",
+  markdown="<full Chinese blog content>"
+)
+```
+
+2. Content: A **complete Chinese translation** of the English blog page — same structure, same figures, same tables, same equations, but all prose translated to Chinese
 5. Translation rules:
    - Section headings: translate to Chinese (e.g., "Background" → "背景", "Method" → "方法", "Experiments" → "实验")
    - Technical terms: keep English in parentheses on first use (e.g., "倒数排名融合 (Reciprocal Rank Fusion)")

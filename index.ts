@@ -5,6 +5,8 @@ import {
   createNotionSavePaperTool,
   createNotionSetupTool,
   createExtractPageImagesTool,
+  createNotionWritePageTool,
+  createNotionCreateChildPageTool,
 } from "./src/notion-tools.js";
 
 function resolveNotionToken(): string {
@@ -36,6 +38,8 @@ const plugin = {
     api.registerTool(createNotionSavePaperTool({ config, notionToken, logger }));
     api.registerTool(createNotionSetupTool({ config, notionToken, logger }));
     api.registerTool(createExtractPageImagesTool({ logger }));
+    api.registerTool(createNotionWritePageTool({ notionToken, logger }));
+    api.registerTool(createNotionCreateChildPageTool({ notionToken, logger }));
 
     logger.info(
       `Paper collector active: databaseId=${config.databaseId || "(not set)"}`,

@@ -115,6 +115,95 @@ export async function savePaperToNotion(params: {
   return { pageId: data.id, url: data.url };
 }
 
+/** Delete all child blocks of a page (to clear content). */
+export async function clearPageContent(params: {
+  token: string;
+  pageId: string;
+}): Promise<void> {
+  const { token, pageId } = params;
+
+  // List all children
+  let cursor: string | undefined;
+  const blockIds: string[] = [];
+  do {
+    const url = `${NOTION_BASE_URL}/blocks/${pageId}/children?page_size=100${cursor ? `&start_cursor=${cursor}` : ""}`;
+    const res = await fetch(url, { headers: buildHeaders(token) });
+    if (!res.ok) break;
+    const data = (await res.json()) as {
+      results: { id: string }[];
+      has_more: boolean;
+      next_cursor: string | null;
+    };
+    for (const block of data.results) blockIds.push(block.id);
+    cursor = data.has_more ? (data.next_cursor ?? undefined) : undefined;
+  } while (cursor);
+
+  // Delete each block
+  for (const id of blockIds) {
+    await fetch(`${NOTION_BASE_URL}/blocks/${id}`, {
+      method: "DELETE",
+      headers: buildHeaders(token),
+    });
+  }
+}
+
+/** Append blocks to a page (handles 100-block API limit). */
+export async function appendBlocks(params: {
+  token: string;
+  pageId: string;
+  blocks: Record<string, unknown>[];
+}): Promise<void> {
+  const { token, pageId, blocks } = params;
+
+  // Notion API limit: 100 blocks per call
+  for (let start = 0; start < blocks.length; start += 100) {
+    const batch = blocks.slice(start, start + 100);
+    const response = await fetch(`${NOTION_BASE_URL}/blocks/${pageId}/children`, {
+      method: "PATCH",
+      headers: buildHeaders(token),
+      body: JSON.stringify({ children: batch }),
+    });
+    if (!response.ok) {
+      const errorBody = await response.text().catch(() => "");
+      throw new Error(`Notion append blocks error ${response.status}: ${errorBody.slice(0, 500)}`);
+    }
+  }
+}
+
+/** Create a child page under a parent page. */
+export async function createChildPage(params: {
+  token: string;
+  parentPageId: string;
+  title: string;
+  icon?: string;
+}): Promise<{ pageId: string; url: string }> {
+  const { token, parentPageId, title, icon } = params;
+
+  const body: Record<string, unknown> = {
+    parent: { type: "page_id", page_id: parentPageId },
+    properties: {
+      title: [{ type: "text", text: { content: title } }],
+    },
+  };
+  if (icon) {
+    body.icon = { type: "emoji", emoji: icon };
+  }
+
+  const response = await fetch(`${NOTION_BASE_URL}/pages`, {
+    method: "POST",
+    headers: buildHeaders(token),
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.text().catch(() => "");
+    throw new Error(`Notion create page error ${response.status}: ${errorBody.slice(0, 500)}`);
+  }
+
+  const data = (await response.json()) as { id: string; url: string };
+  return { pageId: data.id, url: data.url };
+}
+
 /** Check for duplicate source URLs in the database. */
 export async function findBySourceUrl(params: {
   token: string;
