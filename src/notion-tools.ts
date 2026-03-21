@@ -416,9 +416,10 @@ export function createNotionWritePageTool(params: {
     name: "notion_write_page",
     label: "Write Page Content to Notion",
     description:
-      "Write rich content (blog-style summary with headings, equations, figures, tables) " +
-      "to an existing Notion page using Notion-flavored Markdown. " +
-      "Use after notion_save_paper to add a detailed paper summary to the saved page.",
+      "Write a blog-style paper summary (headings, equations, figures, tables) to a Notion page. " +
+      "IMPORTANT: This tool REJECTS content shorter than 25 blocks. " +
+      "You MUST gather content from AlphaXiv (overview + full text), arXiv HTML, and GitHub " +
+      "BEFORE calling this tool. Include figures, complete tables, and detailed sections.",
     parameters: NotionWritePageSchema,
     execute: async (_toolCallId: string, rawParams: Record<string, unknown>) => {
       if (!notionToken) {
@@ -437,20 +438,46 @@ export function createNotionWritePageTool(params: {
       const clearExisting = rawParams.clear_existing !== false; // default true
 
       try {
+        // Convert markdown to blocks first (for validation)
+        const blocks = markdownToBlocks(markdown);
+
+        // Quality gate: count blocks and images
+        const imageCount = blocks.filter(
+          (b: Record<string, unknown>) => b.type === "image",
+        ).length;
+        const MIN_BLOCKS = 25;
+
+        if (blocks.length < MIN_BLOCKS) {
+          logger.warn(
+            `Quality gate: rejected ${blocks.length} blocks (min ${MIN_BLOCKS}) for page ${pageId}`,
+          );
+          return {
+            content: [
+              {
+                type: "text" as const,
+                text:
+                  `REJECTED: Content too short (${blocks.length} blocks, minimum ${MIN_BLOCKS}). ` +
+                  `A proper blog-style summary needs detailed sections with figures and tables.\n\n` +
+                  `Before calling this tool again, you MUST:\n` +
+                  `1. web_fetch https://alphaxiv.org/overview/{PAPER_ID}.md — structured overview\n` +
+                  `2. web_fetch https://alphaxiv.org/abs/{PAPER_ID}.md — complete table data (every row/column)\n` +
+                  `3. Search for figures: try arXiv HTML, GitHub repo (many papers have figures/ dir), or browser screenshots\n` +
+                  `4. Compose 2000-5000 words with: TL;DR, Background, Method (equations + figures), Experiments (result figures + data tables), Discussion, Key Takeaways, References\n\n` +
+                  `Current content has ${imageCount} images. Aim for 3-5 figures from the paper.`,
+              },
+            ],
+          };
+        }
+
+        if (imageCount === 0 && blocks.length < 50) {
+          logger.warn(
+            `Quality warning: ${blocks.length} blocks, 0 images for page ${pageId}`,
+          );
+        }
+
         // Clear existing content if requested
         if (clearExisting) {
           await clearPageContent({ token: notionToken, pageId });
-        }
-
-        // Convert markdown to blocks
-        const blocks = markdownToBlocks(markdown);
-
-        if (blocks.length === 0) {
-          return {
-            content: [
-              { type: "text" as const, text: "Warning: No content blocks generated from the provided markdown." },
-            ],
-          };
         }
 
         // Append blocks to page
@@ -518,8 +545,10 @@ export function createNotionCreateChildPageTool(params: {
     name: "notion_create_child_page",
     label: "Create Child Page in Notion",
     description:
-      "Create a child page under an existing Notion page with rich Markdown content. " +
-      "Use this to create the Chinese translation sub-page after writing the English blog summary.",
+      "Create a Chinese translation sub-page under a Notion page. " +
+      "IMPORTANT: This tool REJECTS content shorter than 25 blocks. " +
+      "The Chinese page must be a FULL translation of the English page — same figures, tables, equations. " +
+      "NOT a short summary.",
     parameters: NotionCreateChildPageSchema,
     execute: async (_toolCallId: string, rawParams: Record<string, unknown>) => {
       if (!notionToken) {
@@ -539,6 +568,34 @@ export function createNotionCreateChildPageTool(params: {
       const markdown = rawParams.markdown as string;
 
       try {
+        // Convert markdown to blocks first (for validation)
+        const blocks = markdownToBlocks(markdown);
+
+        // Quality gate: same minimum as notion_write_page
+        const imageCount = blocks.filter(
+          (b: Record<string, unknown>) => b.type === "image",
+        ).length;
+        const MIN_BLOCKS = 25;
+
+        if (blocks.length < MIN_BLOCKS) {
+          logger.warn(
+            `Quality gate: rejected child page "${title}" with ${blocks.length} blocks (min ${MIN_BLOCKS})`,
+          );
+          return {
+            content: [
+              {
+                type: "text" as const,
+                text:
+                  `REJECTED: Content too short (${blocks.length} blocks, minimum ${MIN_BLOCKS}). ` +
+                  `The Chinese sub-page must be a FULL translation of the English page — ` +
+                  `same sections, same figures (${imageCount} images found), same tables, same equations. ` +
+                  `Take the English markdown and translate every paragraph to Chinese while keeping ` +
+                  `all formatting, image URLs, table data, and equations intact.`,
+              },
+            ],
+          };
+        }
+
         // Create the child page
         const page = await createChildPage({
           token: notionToken,
@@ -547,8 +604,7 @@ export function createNotionCreateChildPageTool(params: {
           icon,
         });
 
-        // Convert and append content
-        const blocks = markdownToBlocks(markdown);
+        // Append content
         if (blocks.length > 0) {
           await appendBlocks({ token: notionToken, pageId: page.pageId, blocks });
         }

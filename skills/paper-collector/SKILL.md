@@ -1,6 +1,6 @@
 ---
 name: paper-collector
-description: "MUST USE when the user sends any URL (arXiv, Xiaohongshu, WeChat, X/Twitter, GitHub, blog, etc.). Fetches content, detects if research/paper-related, extracts metadata (including from images when text is insufficient), and saves to Notion via notion_save_paper. Always read this skill before responding to messages containing URLs."
+description: "MUST USE when the user sends any URL (arXiv, Xiaohongshu, WeChat, X/Twitter, GitHub, blog, etc.). Saves metadata via notion_save_paper, then generates a full blog-style Notion page (notion_write_page REJECTS content under 25 blocks — you MUST web_fetch AlphaXiv overview + full text + find figures BEFORE writing). Also creates a Chinese translation sub-page. Always read this skill before responding to messages containing URLs."
 ---
 
 # Paper Collector

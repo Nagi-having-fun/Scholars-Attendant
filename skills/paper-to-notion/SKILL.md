@@ -1,6 +1,6 @@
 ---
 name: paper-to-notion
-description: Convert a research paper into a blog-style Notion page with proper formatting — equations in KaTeX, embedded figures with captions, structured sections, and all citations hyperlinked. Modeled after Lilian Weng's blog format. Use when the user asks to save a paper's full content to Notion.
+description: "Convert a research paper into a blog-style Notion page (Lilian Weng style). notion_write_page REJECTS content under 25 blocks — you MUST first web_fetch AlphaXiv overview + full text (for complete tables), find figures (arXiv HTML / GitHub repo / browser), then compose 2000-5000 words with embedded figures, tables, equations, and references. Also creates a Chinese translation sub-page with identical content."
 ---
 
 # Paper to Notion — Blog-Style Paper Page
