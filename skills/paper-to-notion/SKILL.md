@@ -126,6 +126,13 @@ Use Notion's table syntax for results tables:
 </table>
 ```
 
+**IMPORTANT — Deduplication rule**: If a table's data is already presented as a **figure image** (e.g., a results comparison chart from the paper's GitHub repo or PDF), do NOT recreate it as a Notion table. Instead, embed the figure with a descriptive caption that includes key numbers. Only use Notion tables for:
+- Data NOT already shown in any figure (e.g., ablation studies, cost analysis, hyperparameter sensitivity)
+- Small supplementary tables that add context beyond what figures show
+- Tables you construct yourself to summarize cross-figure insights
+
+This prevents visual redundancy and keeps the page clean.
+
 ### Citations & References
 
 **In-text citations**: Use numbered superscript links pointing to the references section at the bottom:
@@ -190,8 +197,16 @@ Run the prerequisite skills (or fetch directly) to collect:
 - [ ] Section structure (headings)
 - [ ] All equations with numbering
 - [ ] All figures with URLs and captions
-- [ ] All tables
+- [ ] All tables (from AlphaXiv full text — `alphaxiv.org/abs/{ID}.md` — which provides complete table data)
 - [ ] Reference list with URLs
+
+**Content source priority**:
+1. **AlphaXiv overview** (`alphaxiv.org/overview/{ID}.md`) — structured summary with methodology and results
+2. **AlphaXiv full text** (`alphaxiv.org/abs/{ID}.md`) — complete tables with all rows/columns
+3. **arXiv HTML** (`arxiv.org/html/{ID}`) — individual figure images + full text
+4. **GitHub repo** — check paper's official repo README for high-quality figures (pattern: `github.com/{org}/{repo}/raw/main/figures/*.png`)
+5. **arXiv abstract page** — metadata (authors, date, categories)
+6. **PDF via browser** — fallback for figures when HTML unavailable
 
 ### Step 2: Build the page structure
 

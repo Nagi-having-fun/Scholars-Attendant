@@ -43,6 +43,15 @@ May contain figure references and descriptions.
 **Source D — Semantic Scholar / Papers With Code**:
 Some papers have extracted figures on these platforms. Use `web_search` for `"{paper title}" figures site:paperswithcode.com`.
 
+**Source E — GitHub repository** (often has high-quality figures):
+Many papers have official code repos with figures in a `figures/` or `assets/` directory. Check:
+1. Use `web_search` for `"{paper title}" github` or look for GitHub links on the arXiv abstract page
+2. Fetch the repo's README with `web_fetch` — figures are usually embedded there
+3. Figure URLs follow the pattern: `https://github.com/{org}/{repo}/raw/main/figures/{name}.png`
+4. This source is especially useful when arXiv HTML is unavailable (papers before ~2023 or very new papers where HTML hasn't been generated yet)
+
+**Source priority order**: arXiv HTML → GitHub repo → PDF browser screenshots → Semantic Scholar/PapersWithCode
+
 ### Step 2: Extract figures with metadata
 
 For each figure, collect:
