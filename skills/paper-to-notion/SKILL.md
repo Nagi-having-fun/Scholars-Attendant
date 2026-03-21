@@ -191,22 +191,28 @@ Use toggles for lengthy derivations that readers may want to skip:
 
 ### Step 1: Gather all content
 
-Run the prerequisite skills (or fetch directly) to collect:
+**CRITICAL: Do NOT skip this step. Do NOT start writing until you have gathered content from multiple sources.** A single source is never enough for a high-quality blog page.
+
+Follow this concrete fetch sequence:
+
+1. **`web_fetch` on `https://alphaxiv.org/overview/{PAPER_ID}.md`** — Get structured overview (abstract, contributions, methodology, results). This is your blog skeleton.
+2. **`web_fetch` on `https://alphaxiv.org/abs/{PAPER_ID}.md`** — Get the **full paper text** including **complete table data** (every row, every column, every number). This is essential — without it your tables will be incomplete or missing.
+3. **`web_fetch` on `https://arxiv.org/html/{PAPER_ID}`** — Get individual figure image URLs (look for `<img>` tags with `src` like `/html/{ID}/extracted/figures/*.png`). If 404, proceed to next source.
+4. **`web_search` for `"{paper title}" github`** — Find the official repo. Many papers have high-quality figures at `github.com/{org}/{repo}/raw/main/figures/*.png`. Fetch the repo README to find figure URLs.
+5. **`web_fetch` on `https://arxiv.org/abs/{PAPER_ID}`** — Get metadata (authors, date, categories) if not already known.
+6. **PDF via `browser`** — Fallback for figures when HTML and GitHub are unavailable.
+
+After gathering, you should have:
 - [ ] Paper title, authors, date, venue
 - [ ] Abstract / TL;DR
 - [ ] Section structure (headings)
 - [ ] All equations with numbering
-- [ ] All figures with URLs and captions
-- [ ] All tables (from AlphaXiv full text — `alphaxiv.org/abs/{ID}.md` — which provides complete table data)
+- [ ] All figures with direct image URLs and captions (aim for **all** figures in the paper, not just 1-2)
+- [ ] All tables with **complete data** — every row, every column, every number (from AlphaXiv full text)
 - [ ] Reference list with URLs
 
-**Content source priority**:
-1. **AlphaXiv overview** (`alphaxiv.org/overview/{ID}.md`) — structured summary with methodology and results
-2. **AlphaXiv full text** (`alphaxiv.org/abs/{ID}.md`) — complete tables with all rows/columns
-3. **arXiv HTML** (`arxiv.org/html/{ID}`) — individual figure images + full text
-4. **GitHub repo** — check paper's official repo README for high-quality figures (pattern: `github.com/{org}/{repo}/raw/main/figures/*.png`)
-5. **arXiv abstract page** — metadata (authors, date, categories)
-6. **PDF via browser** — fallback for figures when HTML unavailable
+**If you don't have figures**: you MUST try at least 3 sources before giving up. Missing figures dramatically reduces page quality.
+**If you don't have complete tables**: fetch AlphaXiv full text (`/abs/{ID}.md`). The overview endpoint summarizes tables; only the full text has complete data.
 
 ### Step 2: Build the page structure
 
@@ -240,7 +246,7 @@ If the database entry doesn't exist yet, create it first via `notion_save_paper`
 
 ### Step 6: Create the Chinese sub-page
 
-**MANDATORY**: After creating the English page, create a **Chinese translation sub-page** as a child of the main page:
+**MANDATORY**: After creating the English page, create a **Chinese translation sub-page** as a child of the main page.
 
 ```
 notion_create_child_page(
@@ -251,15 +257,29 @@ notion_create_child_page(
 )
 ```
 
-2. Content: A **complete Chinese translation** of the English blog page — same structure, same figures, same tables, same equations, but all prose translated to Chinese
-5. Translation rules:
-   - Section headings: translate to Chinese (e.g., "Background" → "背景", "Method" → "方法", "Experiments" → "实验")
-   - Technical terms: keep English in parentheses on first use (e.g., "倒数排名融合 (Reciprocal Rank Fusion)")
-   - Figure captions: translate to Chinese
-   - Table headers: translate to Chinese
-   - Equations: keep LaTeX as-is, translate surrounding text
-   - Reference list: keep original English citations, do not translate paper titles
-   - Image URLs: identical to English version
+**CRITICAL — this is a FULL TRANSLATION, not a summary.** The Chinese page must be the same length and depth as the English page. Specifically:
+
+**Completeness checklist** (all MUST be present):
+- [ ] Same number of sections as English (TL;DR → Background → Method → Experiments → Discussion → Key Takeaways → References)
+- [ ] **Every figure** from the English page — same image URLs, captions translated to Chinese
+- [ ] **Every table** from the English page — same data, headers translated to Chinese
+- [ ] **Every equation** from the English page — LaTeX unchanged, surrounding text translated
+- [ ] **Every callout** from the English page — translated content, same icons and colors
+- [ ] **Every reference** — keep original English citations, do not translate paper titles
+- [ ] Word count: **2000-5000 Chinese characters** (comparable to the English version)
+
+**Common mistake**: generating a short 500-word summary instead of translating the full 3000-word English blog. Do NOT do this. If the English page has 15 sections with 5 figures and 6 tables, the Chinese page must also have 15 sections with 5 figures and 6 tables.
+
+**Translation rules**:
+- Section headings: translate (e.g., "Background" → "背景", "Method" → "方法", "Experiments" → "实验", "Key Takeaways" → "关键收获")
+- Technical terms: keep English in parentheses on first use (e.g., "倒数排名融合 (Reciprocal Rank Fusion)")
+- Figure captions: translate to Chinese
+- Table headers: translate to Chinese, data values unchanged
+- Equations: keep LaTeX as-is, translate only surrounding prose
+- Reference list: keep original English citations verbatim
+- Image URLs: **identical** to English version — do not modify or omit any
+
+**How to produce the Chinese page**: Take the English markdown you already wrote in Step 5. Translate every paragraph of prose to Chinese while keeping all markdown formatting, image links, table markup, equations, and callouts intact. This ensures nothing is accidentally dropped.
 
 ### Step 7: Verify
 
@@ -272,13 +292,15 @@ After creation, use the `fetch` tool to verify:
 
 ## Content Guidelines
 
-- **English page**: Always in English
-- **Chinese sub-page**: Always in Chinese (with English technical terms preserved)
-- **Be concise but complete** — aim for blog-post length (2000-5000 words), not the full paper
+- **English page**: Always in English, 2000-5000 words
+- **Chinese sub-page**: Always in Chinese (with English technical terms preserved), **same length and depth as English** — 2000-5000 Chinese characters. NOT a summary.
+- **Both pages must include**: all figures, all data tables, all equations, all callouts. The Chinese page is a mirror of the English page in Chinese.
 - **Explain intuition** before showing equations — "The key idea is X. Formally, this is expressed as..."
 - **Add your own bridging text** — don't just dump raw paper content; connect sections logically
 - **Highlight what's novel** — what makes this paper different from prior work?
 - **Include practical implications** — "This means that in practice..."
+- **Figures are non-negotiable** — a blog page without figures looks incomplete. Try at least 3 sources (arXiv HTML, GitHub, browser) before concluding no figures are available.
+- **Tables must be complete** — include every row and column from the paper, not just top-3 results. Fetch AlphaXiv full text for complete table data.
 
 ## Notes
 

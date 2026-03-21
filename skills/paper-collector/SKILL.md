@@ -164,12 +164,17 @@ Call `notion_save_paper` with the extracted metadata.
 
 ### Step 6: Auto-generate blog summary
 
-**MANDATORY**: After successfully saving metadata to Notion, automatically run the `paper-to-notion` skill to generate a blog-style summary page. Do NOT wait for user to ask — this is part of the default workflow.
+**MANDATORY**: After successfully saving metadata to Notion, automatically generate a full blog-style summary page. Do NOT wait for user to ask — this is part of the default workflow. Follow the `paper-to-notion` skill instructions.
 
-The `paper-to-notion` skill will:
-1. Gather content from AlphaXiv, arXiv, and GitHub
-2. Create a rich English blog summary as the page content
-3. Create a Chinese translation sub-page at the end
+**You MUST gather all content before writing.** Do NOT skip these steps:
+
+1. **Fetch AlphaXiv overview** — `web_fetch` on `https://alphaxiv.org/overview/{PAPER_ID}.md` for structured summary with methodology and results
+2. **Fetch AlphaXiv full text** — `web_fetch` on `https://alphaxiv.org/abs/{PAPER_ID}.md` for **complete table data** (all rows, all columns, all numbers — this is critical for faithful tables)
+3. **Fetch figures** — follow `paper-figures` skill: try arXiv HTML first, then search for GitHub repo (many papers have figures at `github.com/{org}/{repo}/raw/main/figures/*.png`), then fall back to PDF screenshots
+4. **Compose the English blog page** (2000-5000 words) with: TL;DR, Background, Method (with equations + figures), Experiments (with result figures + complete data tables), Discussion, Key Takeaways, References. Use `notion_write_page` to write it.
+5. **Create the Chinese sub-page** — a **complete, full-length translation** of the English page (NOT a summary). Must include every figure, every table, every equation, every callout from the English version. Use `notion_create_child_page` to create it.
+
+**Quality bar**: The output should read like a Lilian Weng blog post — detailed methodology, embedded figures with captions, complete data tables, key insight callouts, and hyperlinked references.
 
 ### Step 7: Reply to user
 
