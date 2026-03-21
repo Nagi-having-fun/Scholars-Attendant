@@ -228,23 +228,42 @@ For each citation in the paper:
 2. Format as: `[Authors, "Title," *Venue Year*](URL)`
 3. If no URL found, include the citation text without a link
 
-### Step 5: Create the Notion page
+### Step 5: Create the English Notion page
 
-Use the Notion `create-pages` tool to create the page under the Paper Collection database entry. The page should be a **child of the paper's database entry** (the row created by `notion_save_paper`).
+Use `update-page` with `replace_content` to write the blog-style content into the paper's database entry page. The English version is always the **main page content**.
 
-If the database entry doesn't exist yet, create it first via `notion_save_paper`, then add the blog page as content to that database entry using `update-page` with `replace_content`.
+If the database entry doesn't exist yet, create it first via `notion_save_paper`, then add the blog page as content using `update-page` with `replace_content`.
 
-### Step 6: Verify
+### Step 6: Create the Chinese sub-page
+
+**MANDATORY**: After creating the English page, create a **Chinese translation sub-page** as a child of the main page:
+
+1. Use `create-pages` with `parent: { page_id: "<paper_page_id>" }`
+2. Title format: `中文摘要 — {Paper Title in Chinese}`
+3. Icon: 🇨🇳
+4. Content: A **complete Chinese translation** of the English blog page — same structure, same figures, same tables, same equations, but all prose translated to Chinese
+5. Translation rules:
+   - Section headings: translate to Chinese (e.g., "Background" → "背景", "Method" → "方法", "Experiments" → "实验")
+   - Technical terms: keep English in parentheses on first use (e.g., "倒数排名融合 (Reciprocal Rank Fusion)")
+   - Figure captions: translate to Chinese
+   - Table headers: translate to Chinese
+   - Equations: keep LaTeX as-is, translate surrounding text
+   - Reference list: keep original English citations, do not translate paper titles
+   - Image URLs: identical to English version
+
+### Step 7: Verify
 
 After creation, use the `fetch` tool to verify:
 - Equations render correctly (no broken KaTeX)
 - Images load (URLs are accessible)
 - Table formatting is correct
 - Links work
+- Chinese sub-page exists and is accessible
 
 ## Content Guidelines
 
-- **Write in the language the user uses** (Chinese or English)
+- **English page**: Always in English
+- **Chinese sub-page**: Always in Chinese (with English technical terms preserved)
 - **Be concise but complete** — aim for blog-post length (2000-5000 words), not the full paper
 - **Explain intuition** before showing equations — "The key idea is X. Formally, this is expressed as..."
 - **Add your own bridging text** — don't just dump raw paper content; connect sections logically

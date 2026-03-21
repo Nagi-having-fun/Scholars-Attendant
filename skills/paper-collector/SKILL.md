@@ -162,20 +162,28 @@ Combine information from the original source AND the paper's actual page:
 
 Call `notion_save_paper` with the extracted metadata.
 
-### Step 6: Reply to user
+### Step 6: Auto-generate blog summary
 
-Brief confirmation with the paper title, authors, one-line summary, and Notion link.
+**MANDATORY**: After successfully saving metadata to Notion, automatically run the `paper-to-notion` skill to generate a blog-style summary page. Do NOT wait for user to ask — this is part of the default workflow.
+
+The `paper-to-notion` skill will:
+1. Gather content from AlphaXiv, arXiv, and GitHub
+2. Create a rich English blog summary as the page content
+3. Create a Chinese translation sub-page at the end
+
+### Step 7: Reply to user
+
+Brief confirmation with the paper title, authors, one-line summary, and Notion link. Mention that a blog-style summary (English + Chinese) has been generated.
 
 If the paper was identified through image inference, also mention how it was found (e.g., "Identified from architecture diagram in image 2").
 
-### Step 7: Offer additional actions
+### Step 8: Offer additional actions
 
-After saving metadata, offer the user these follow-up actions:
+After saving metadata and generating the blog summary, offer the user these follow-up actions:
 
-- **"Want a detailed summary?"** → Use `alphaxiv-lookup` for a structured overview
+- **"Want a more detailed summary?"** → Use `alphaxiv-lookup` for a structured overview
 - **"Want to see the equations/tables?"** → Use `paper-parse` to extract formatted math and tables
 - **"Save figures?"** → Use `paper-figures` to extract and list all paper figures
-- **"Create a full Notion blog page?"** → Use `paper-to-notion` to create a richly formatted Notion page with equations, figures, and hyperlinked references
 
 ## Language Handling
 
