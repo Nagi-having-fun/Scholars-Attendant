@@ -11,6 +11,9 @@ An [OpenClaw](https://github.com/openclaw/openclaw) plugin that automatically de
 - **Formula & table parsing**: Extract equations with correct LaTeX formatting and numbering, plus tables with proper structure
 - **Figure extraction**: Collect paper figures with captions from arXiv HTML, PDF screenshots, or other sources
 - **Blog-style Notion pages**: Convert papers into richly formatted Notion pages with KaTeX equations, embedded figures, hyperlinked references, and toggle sections — modeled after [Lilian Weng's blog](https://lilianweng.github.io/)
+- **Chinese translation sub-pages**: Automatically creates a complete Chinese translation as a child page (same figures, tables, equations — not a summary)
+- **Quality gate enforcement**: `notion_write_page` and `notion_create_child_page` reject content under 25 blocks, forcing the agent to gather sufficient content before writing
+- **Progress reporting**: Sends status messages at each workflow step; never silently fails; reports detailed errors with fallback actions
 - **Notion integration**: Auto-saves to a Notion database with deduplication
 - **Multi-language support**: Handles Chinese/English content, always extracts English paper titles
 
@@ -29,18 +32,24 @@ The plugin provides 5 AI skills that work together as a paper analysis pipeline:
 ### Typical Workflow
 
 ```
-User sends a paper URL
+User sends a paper URL (Discord / Telegram / Web)
         │
         ▼
   paper-collector          ← Auto-detect, extract metadata, save to Notion DB
-        │
-        ▼ (follow-up actions)
-        │
-   ┌────┼────────────┬──────────────┐
-   ▼    ▼            ▼              ▼
-alphaxiv  paper-parse  paper-figures  paper-to-notion
- lookup   (equations    (save figs)   (full blog page
-(summary)  & tables)                   in Notion)
+        │                     📄 "Processing paper link..."
+        │                     ✅ "Metadata saved. Generating blog summary..."
+        ▼
+  Gather content           ← AlphaXiv overview + full text + arXiv HTML + GitHub figures
+        │                     🔍 "Gathering content from AlphaXiv, arXiv, GitHub..."
+        ▼
+  notion_write_page        ← English blog page (2000-5000 words, ≥25 blocks required)
+        │                     ✅ "English page: 108 blocks, 5 figures"
+        ▼
+  notion_create_child_page ← Chinese translation (full mirror, NOT a summary)
+        │                     ✅ "Chinese page: 102 blocks"
+        ▼
+  Reply to user            ← Title, authors, Notion link, stats
+                              ❌ On failure: detailed error + fallback actions
 ```
 
 ## Supported Platforms
@@ -56,7 +65,7 @@ alphaxiv  paper-parse  paper-figures  paper-to-notion
 
 ## How It Works
 
-1. User sends a URL in a message
+1. User sends a URL in a message (Discord, Telegram, or web UI)
 2. Plugin fetches and evaluates the content via `web_fetch`
 3. If text content is insufficient (blocked by anti-scraping, login walls, etc.):
    - Falls back to browser screenshots
@@ -64,7 +73,9 @@ alphaxiv  paper-parse  paper-figures  paper-to-notion
    - Uses visual clues (paper titles in screenshots, architecture diagrams, figure captions, arXiv IDs) to search for the paper
 4. Extracts structured metadata (title, authors, institutions, summary, tags, etc.)
 5. Saves to Notion database with duplicate checking
-6. Offers follow-up actions: summary, equation extraction, figure saving, or full blog-style Notion page
+6. **Auto-generates blog-style English Notion page** (2000-5000 words) with figures, tables, equations, and references
+7. **Auto-generates Chinese translation sub-page** — a full mirror with identical figures, tables, and equations
+8. Reports progress at every step; reports failures with detailed reasons and fallback actions
 
 ### Image-Based Inference Flow
 
@@ -129,6 +140,8 @@ Add this plugin to your OpenClaw configuration and set the `databaseId` in the p
 | `notion_save_paper` | Save a paper's structured metadata to the Notion database |
 | `notion_setup` | One-time setup: create the Paper Collection database in Notion |
 | `extract_page_images` | Extract image URLs from HTML for visual paper identification |
+| `notion_write_page` | Write blog-style content to a Notion page (quality gate: rejects < 25 blocks) |
+| `notion_create_child_page` | Create a child page (e.g., Chinese translation) under an existing page (quality gate: rejects < 25 blocks) |
 
 ## Notion Database Schema
 
@@ -154,8 +167,9 @@ Add this plugin to your OpenClaw configuration and set the `databaseId` in the p
 ├── src/
 │   ├── config.ts             # Configuration parser
 │   ├── types.ts              # TypeScript type definitions
-│   ├── notion-client.ts      # Notion API client
-│   ├── notion-tools.ts       # Tool definitions (save_paper, setup, extract_images)
+│   ├── notion-client.ts      # Notion API client (CRUD, batch append, child pages)
+│   ├── notion-tools.ts       # Tool definitions (save_paper, setup, extract_images, write_page, create_child_page)
+│   ├── markdown-to-blocks.ts # Markdown → Notion block converter (headings, equations, images, tables, callouts)
 │   └── image-extract.ts      # HTML image URL extraction utilities
 └── skills/
     ├── paper-collector/      # Core: URL detection, metadata extraction, Notion save

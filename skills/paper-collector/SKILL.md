@@ -7,6 +7,37 @@ description: "MUST USE when the user sends any URL (arXiv, Xiaohongshu, WeChat, 
 
 When a user sends a message containing a URL, evaluate whether the content is research or paper-related. If it is, extract structured metadata and save it to Notion using the `notion_save_paper` tool.
 
+## CRITICAL: Progress Reporting & Failure Handling
+
+**You MUST send status messages to the user throughout the workflow.** Never go silent. The user should always know what is happening.
+
+### Required status messages (send these as replies to the user):
+
+1. **Immediately after receiving a URL**: "📄 Processing paper link... fetching content."
+2. **After identifying the paper**: "Found: *{Paper Title}* by {Authors}. Saving metadata to Notion..."
+3. **After saving metadata**: "✅ Metadata saved. Now generating blog-style summary (this takes 1-2 minutes)..."
+4. **During content gathering**: "🔍 Gathering content: fetching AlphaXiv overview, full text, and figures..."
+5. **After writing English page**: "✅ English blog page written ({N} blocks, {M} figures). Now creating Chinese translation..."
+6. **After writing Chinese page**: "✅ Done! English + Chinese pages created.\n📖 {Notion URL}"
+7. **On ANY failure**: "❌ Failed at step: {step name}. Reason: {specific error}. {What I'll try next / what you can do}"
+
+### Failure reporting rules:
+
+- **NEVER silently fail.** If ANY step fails, you MUST tell the user what happened and why.
+- If `web_fetch` fails: report the URL and error, explain what fallback you're trying.
+- If `notion_write_page` rejects content (quality gate): tell the user "Content was too short ({N} blocks), gathering more data..." then retry.
+- If AlphaXiv is unavailable (404): tell the user, then fall back to arXiv abstract + HTML.
+- If no figures found after trying all sources: tell the user "Could not find figure images from arXiv HTML, GitHub, or browser. The page will have text-only content."
+- If the entire workflow fails: give a detailed failure report with what was attempted and what went wrong.
+
+### Answering "how's it going?" / status queries:
+
+If the user asks about progress on a paper task, respond with:
+- What paper you're processing
+- Which step you're currently on (metadata / content gathering / writing English / writing Chinese)
+- Any issues encountered so far
+- Estimated remaining work
+
 ## URL Detection
 
 Activate this workflow when the user's message contains a URL from any source, including but not limited to:
@@ -160,27 +191,87 @@ Combine information from the original source AND the paper's actual page:
 
 ### Step 5: Save to Notion
 
-Call `notion_save_paper` with the extracted metadata.
+Call `notion_save_paper` with the extracted metadata. **Tell the user**: "✅ Metadata saved for *{title}*. Now generating blog summary..."
+
+**IMPORTANT**: The `notion_save_paper` response contains the page ID and URL. Save these — you need the page ID for `notion_write_page` and `notion_create_child_page`.
 
 ### Step 6: Auto-generate blog summary
 
-**MANDATORY**: After successfully saving metadata to Notion, automatically generate a full blog-style summary page. Do NOT wait for user to ask — this is part of the default workflow. Follow the `paper-to-notion` skill instructions.
+**MANDATORY**: After successfully saving metadata to Notion, automatically generate a full blog-style summary page. Do NOT wait for user to ask — this is part of the default workflow.
 
-**You MUST gather all content before writing.** Do NOT skip these steps:
+**Tell the user**: "🔍 Gathering content from AlphaXiv, arXiv, and GitHub..."
 
-1. **Fetch AlphaXiv overview** — `web_fetch` on `https://alphaxiv.org/overview/{PAPER_ID}.md` for structured summary with methodology and results
-2. **Fetch AlphaXiv full text** — `web_fetch` on `https://alphaxiv.org/abs/{PAPER_ID}.md` for **complete table data** (all rows, all columns, all numbers — this is critical for faithful tables)
-3. **Fetch figures** — follow `paper-figures` skill: try arXiv HTML first, then search for GitHub repo (many papers have figures at `github.com/{org}/{repo}/raw/main/figures/*.png`), then fall back to PDF screenshots
-4. **Compose the English blog page** (2000-5000 words) with: TL;DR, Background, Method (with equations + figures), Experiments (with result figures + complete data tables), Discussion, Key Takeaways, References. Use `notion_write_page` to write it.
-5. **Create the Chinese sub-page** — a **complete, full-length translation** of the English page (NOT a summary). Must include every figure, every table, every equation, every callout from the English version. Use `notion_create_child_page` to create it.
+#### 6a: Gather ALL content first (DO NOT SKIP)
 
-**Quality bar**: The output should read like a Lilian Weng blog post — detailed methodology, embedded figures with captions, complete data tables, key insight callouts, and hyperlinked references.
+You MUST complete ALL of these fetch steps before writing. Do them in parallel where possible:
+
+1. **Fetch AlphaXiv overview** — `web_fetch` on `https://alphaxiv.org/overview/{PAPER_ID}.md`
+   - If 404: report to user ("AlphaXiv overview unavailable, using arXiv abstract instead"), use the abstract from Step 1.
+2. **Fetch AlphaXiv full text** — `web_fetch` on `https://alphaxiv.org/abs/{PAPER_ID}.md`
+   - This contains **complete table data** (all rows, all columns). Without it, your tables will be incomplete.
+   - If 404: report to user, fall back to extracting table data from arXiv HTML or abstract.
+3. **Fetch figures** — try ALL sources in order, stop when you have ≥3 figures:
+   - `web_fetch` on `https://arxiv.org/html/{PAPER_ID}` — extract `<img>` tags with figure URLs
+   - `web_search` for `"{paper title}" github` — find repo, look for figures in README
+   - If both fail: use `browser` to screenshot the PDF at `https://arxiv.org/pdf/{PAPER_ID}`
+   - **Report to user what you found**: "Found {N} figures from {source}."
+
+#### 6b: Compose English blog page
+
+Write a **2000-5000 word** blog-style page with these sections:
+- **TL;DR** (1-2 sentences)
+- **Background** (context, motivation, prior work)
+- **Method** (detailed, with equations and figures)
+- **Experiments** (setup, results figures, complete data tables with ALL rows/columns)
+- **Discussion** (limitations, ablations, observations)
+- **Key Takeaways** (bulleted list)
+- **References** (numbered, hyperlinked)
+
+Call `notion_write_page` with the composed markdown.
+
+**If `notion_write_page` REJECTS the content** (quality gate: < 25 blocks):
+1. **Tell the user**: "Content was too short ({N} blocks). Gathering more data and retrying..."
+2. Go back to 6a and fetch ANY sources you skipped
+3. Expand your content: add more detail to Method and Experiments sections, include more equations, add more figures
+4. Retry `notion_write_page` with the expanded content
+5. If rejected again after 2 attempts, tell the user with details
+
+**Tell the user after success**: "✅ English blog page written ({N} blocks, {M} figures)."
+
+#### 6c: Create Chinese sub-page
+
+**MANDATORY.** Create a complete Chinese translation as a child page.
+
+**How to do this**: Take the EXACT English markdown from 6b. Translate every paragraph of prose to Chinese. Keep ALL of the following unchanged:
+- Image URLs and markdown syntax (`![caption](url)`)
+- Table markup and data values
+- LaTeX equations (`$...$` and `$$...$$`)
+- Callout markup
+- Reference list entries
+
+The Chinese page must have the **same number of sections, figures, tables, and equations** as the English page. It must be 2000-5000 Chinese characters. NOT a short summary.
+
+Call `notion_create_child_page` with `parent_page_id` set to the page from Step 5, title "中文摘要 — {Chinese Title}", icon "🇨🇳".
+
+**If rejected by quality gate**: same retry procedure as 6b.
+
+**Tell the user after success**: "✅ Chinese translation page created ({N} blocks)."
 
 ### Step 7: Reply to user
 
-Brief confirmation with the paper title, authors, one-line summary, and Notion link. Mention that a blog-style summary (English + Chinese) has been generated.
+Final confirmation with:
+- Paper title and authors
+- One-line summary
+- Notion link
+- Stats: "{N} blocks English, {M} blocks Chinese, {K} figures"
 
-If the paper was identified through image inference, also mention how it was found (e.g., "Identified from architecture diagram in image 2").
+If the paper was identified through image inference, also mention how.
+
+**If any step failed**, include a failure report:
+- Which step failed
+- What error occurred
+- What was attempted as a fallback
+- What the user can do (e.g., "try sending the arXiv link directly")
 
 ### Step 8: Offer additional actions
 

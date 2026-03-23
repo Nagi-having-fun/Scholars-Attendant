@@ -187,6 +187,16 @@ Use toggles for lengthy derivations that readers may want to skip:
 </details>
 ```
 
+## Progress Reporting
+
+**You MUST send status messages to the user at each major step.** Never go silent.
+
+- After gathering content: "🔍 Gathered {N} sources: {list what you found}."
+- After writing English page: "✅ English page: {N} blocks, {M} figures."
+- After writing Chinese page: "✅ Chinese page: {N} blocks."
+- On failure: "❌ {Step} failed: {reason}. {Fallback action}."
+- On quality gate rejection: "⚠️ Content too short ({N} blocks). Gathering more data..."
+
 ## Workflow
 
 ### Step 1: Gather all content
@@ -243,6 +253,21 @@ notion_write_page(page_id="<page_id>", markdown="<full blog content>", clear_exi
 ```
 
 If the database entry doesn't exist yet, create it first via `notion_save_paper`, then use `notion_write_page` with the returned page ID.
+
+#### Handling quality gate rejection
+
+`notion_write_page` will **REJECT** content with fewer than 25 blocks. If this happens:
+
+1. **Tell the user**: "⚠️ Content too short ({N} blocks). Expanding with more detail..."
+2. **Expand the content**:
+   - Add more detail to Method section (step-by-step explanations, more equations)
+   - Add more detail to Experiments section (describe each table row, explain trends)
+   - Add Background section if missing (prior work, motivation)
+   - Add Discussion section if missing (limitations, ablations)
+   - Ensure you have Key Takeaways (bulleted list of 5-8 points)
+   - Ensure you have a full References section
+3. **Retry** `notion_write_page` with the expanded content
+4. If still rejected after 2 tries, **tell the user** with the specific block count and what content is available
 
 ### Step 6: Create the Chinese sub-page
 
