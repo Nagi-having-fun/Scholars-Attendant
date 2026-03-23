@@ -32,11 +32,20 @@ When a user sends a message containing a URL, evaluate whether the content is re
 
 ### Answering "how's it going?" / status queries:
 
-If the user asks about progress on a paper task, respond with:
-- What paper you're processing
-- Which step you're currently on (metadata / content gathering / writing English / writing Chinese)
-- Any issues encountered so far
-- Estimated remaining work
+**IMPORTANT**: If the user sends ANY message while you are still processing a paper (e.g., "找得怎么样了", "how's it going?", "进度如何", "done yet?"), you MUST immediately reply with your current status. Do NOT ignore the message. Respond with:
+- What paper you're processing (title if known, URL if not yet identified)
+- Which step you're currently on: (1) fetching URL content, (2) identifying paper, (3) saving metadata, (4) gathering blog content, (5) writing English page, (6) writing Chinese page
+- Any issues encountered so far (e.g., "AlphaXiv returned 404, falling back to arXiv HTML")
+- What's left to do
+
+### Completion notification:
+
+**MANDATORY**: After finishing the ENTIRE workflow (metadata + English + Chinese), you MUST send a final summary message to the user. Even if the user hasn't asked. The message should include:
+- Paper title and authors
+- Notion page link
+- Block counts (English + Chinese)
+- Figure count
+- Any issues or compromises made during processing
 
 ## URL Detection
 
@@ -218,13 +227,15 @@ You MUST complete ALL of these fetch steps before writing. Do them in parallel w
 
 #### 6b: Compose English blog page
 
+**Quality standard (Keshav's two-pass reading depth)**: A reader of this page must be able to **summarize the paper's main thrust, with supporting evidence, to someone else** — without reading the original paper. This means detailed method explanation, complete results with specific numbers, and all key figures embedded.
+
 Write a **2000-5000 word** blog-style page with these sections:
-- **TL;DR** (1-2 sentences)
-- **Background** (context, motivation, prior work)
-- **Method** (detailed, with equations and figures)
-- **Experiments** (setup, results figures, complete data tables with ALL rows/columns)
-- **Discussion** (limitations, ablations, observations)
-- **Key Takeaways** (bulleted list)
+- **TL;DR** (1-2 sentences — the core contribution in plain language)
+- **Background** (2-3 paragraphs: what problem exists, what came before, what gap remains, what theoretical basis is used)
+- **Method** (detailed step-by-step: "The approach works by (1)..., (2)..., (3)..." — include architecture figures, key equations with explanation of each term, not just "they use a transformer")
+- **Experiments** (setup, results figures, **complete data tables with ALL rows/columns** — include specific numbers and comparisons, explain trends, not just "achieves SOTA")
+- **Discussion** (limitations, ablation studies, what doesn't work, open questions)
+- **Key Takeaways** (bulleted list of 5-8 concrete points)
 - **References** (numbered, hyperlinked)
 
 Call `notion_write_page` with the composed markdown.
@@ -242,6 +253,14 @@ Call `notion_write_page` with the composed markdown.
 
 **MANDATORY.** Create a complete Chinese translation as a child page.
 
+**Quality standard (Keshav's two-pass depth)**: After reading only the Chinese page, a reader must be able to **summarize the paper's approach, results, and contributions with supporting evidence to someone else** — without ever opening the original paper. Concretely, the reader must be able to answer:
+- What problem does the paper solve? (motivation + research gap)
+- How does the method work? (step-by-step, with key equations explained)
+- What are the specific results? (numbers, comparisons, trends — not "achieves SOTA")
+- What do the figures show? (every figure embedded with explanatory caption)
+- How does this relate to prior work?
+- What are the limitations?
+
 **How to do this**: Take the EXACT English markdown from 6b. Translate every paragraph of prose to Chinese. Keep ALL of the following unchanged:
 - Image URLs and markdown syntax (`![caption](url)`)
 - Table markup and data values
@@ -249,7 +268,7 @@ Call `notion_write_page` with the composed markdown.
 - Callout markup
 - Reference list entries
 
-The Chinese page must have the **same number of sections, figures, tables, and equations** as the English page. It must be 2000-5000 Chinese characters. NOT a short summary.
+The Chinese page must have the **same number of sections, figures, tables, and equations** as the English page. It must be **2000-5000 Chinese characters**. NOT a short summary — a full-depth mirror.
 
 Call `notion_create_child_page` with `parent_page_id` set to the page from Step 5, title "中文摘要 — {Chinese Title}", icon "🇨🇳".
 

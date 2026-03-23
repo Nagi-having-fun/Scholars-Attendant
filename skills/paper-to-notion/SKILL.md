@@ -282,16 +282,19 @@ notion_create_child_page(
 )
 ```
 
-**CRITICAL — this is a FULL TRANSLATION, not a summary.** The Chinese page must be the same length and depth as the English page. Specifically:
+**CRITICAL — this is a FULL TRANSLATION at Keshav's two-pass depth, not a summary.** After reading only the Chinese page, a reader must be able to summarize the paper's approach, results, and contributions with supporting evidence to someone else — without ever opening the original paper.
 
 **Completeness checklist** (all MUST be present):
-- [ ] Same number of sections as English (TL;DR → Background → Method → Experiments → Discussion → Key Takeaways → References)
-- [ ] **Every figure** from the English page — same image URLs, captions translated to Chinese
-- [ ] **Every table** from the English page — same data, headers translated to Chinese
-- [ ] **Every equation** from the English page — LaTeX unchanged, surrounding text translated
+- [ ] Same number of sections as English (TL;DR → 背景 → 方法 → 实验 → 讨论 → 关键收获 → 参考文献)
+- [ ] **Every figure** from the English page — same image URLs, captions translated to Chinese and explaining what the figure shows
+- [ ] **Every table** from the English page — same data, headers translated to Chinese, complete rows (not top-3)
+- [ ] **Every equation** from the English page — LaTeX unchanged, surrounding text translated with intuitive explanation of what each term means
 - [ ] **Every callout** from the English page — translated content, same icons and colors
 - [ ] **Every reference** — keep original English citations, do not translate paper titles
 - [ ] Word count: **2000-5000 Chinese characters** (comparable to the English version)
+- [ ] **Method section**: step-by-step explanation, not a one-liner — reader should understand how the method works
+- [ ] **Experiments section**: specific numbers, comparisons, trends — reader should know the key results
+- [ ] **Background section**: 2-3 paragraphs of context — what came before, what gap this paper fills
 
 **Common mistake**: generating a short 500-word summary instead of translating the full 3000-word English blog. Do NOT do this. If the English page has 15 sections with 5 figures and 6 tables, the Chinese page must also have 15 sections with 5 figures and 6 tables.
 
@@ -315,11 +318,37 @@ After creation, use the `fetch` tool to verify:
 - Links work
 - Chinese sub-page exists and is accessible
 
+## Content Depth Standard: Keshav's "Two-Pass" Reading Level
+
+The Chinese summary page (and the English page it mirrors) must provide **at least Keshav's second-pass reading depth** (ref: S. Keshav, "How to Read a Paper", ACM SIGCOMM). This means:
+
+> After reading the Chinese summary, the reader should be able to **summarize the main thrust of the paper, with supporting evidence, to someone else**.
+
+Concretely, the reader must be able to answer ALL of these after reading only your summary:
+
+1. **What problem does the paper solve?** — Clear statement of the research gap and motivation
+2. **What is the paper's main approach/method?** — Step-by-step explanation with key equations, not just a one-liner
+3. **What are the key results?** — Specific numbers, comparisons, and trends from experiments (with complete data tables, not cherry-picked rows)
+4. **What do the figures and diagrams show?** — Every major figure must be embedded with a caption that explains what it demonstrates; the reader should understand figures without opening the original paper
+5. **How does this relate to prior work?** — Positioning against baselines and related methods
+6. **What are the limitations and open questions?** — Honest assessment, not just hype
+7. **What are the main contributions?** — Concrete list (not vague claims)
+
+### What "second-pass depth" looks like in practice:
+
+- **Method section**: Not "they use a transformer." Instead: "They propose X, which works by (1)..., (2)..., (3)... The key equation is $...$ where each term means..." Include architecture diagrams.
+- **Experiments section**: Not "they achieve SOTA." Instead: "On benchmark X, the method scores Y (vs. Z for the baseline), a N% improvement. Table 1 shows..." Include the full results table.
+- **Figures**: Not a page without images. Instead: every key figure (architecture, results plots, ablation charts) embedded with a translated caption explaining what the reader should notice.
+- **Background**: Not skipped. Instead: 2-3 paragraphs of context — what came before, what problem remained unsolved, what theoretical framework is used.
+
+### Minimum content requirements:
+
+- **English page**: 2000-5000 words, ≥25 blocks, ≥3 figures
+- **Chinese sub-page**: 2000-5000 Chinese characters, ≥25 blocks, same figures/tables/equations as English. **NOT a summary — a full mirror.**
+- **Both pages must include**: all figures, all data tables, all equations, all callouts.
+
 ## Content Guidelines
 
-- **English page**: Always in English, 2000-5000 words
-- **Chinese sub-page**: Always in Chinese (with English technical terms preserved), **same length and depth as English** — 2000-5000 Chinese characters. NOT a summary.
-- **Both pages must include**: all figures, all data tables, all equations, all callouts. The Chinese page is a mirror of the English page in Chinese.
 - **Explain intuition** before showing equations — "The key idea is X. Formally, this is expressed as..."
 - **Add your own bridging text** — don't just dump raw paper content; connect sections logically
 - **Highlight what's novel** — what makes this paper different from prior work?
