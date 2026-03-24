@@ -29,10 +29,17 @@ Use `web_fetch` to get the HTML page. Extract `<img>` tags — arXiv HTML embeds
 https://arxiv.org/html/{PAPER_ID}/extracted/figures/figure1.png
 ```
 
-**Source B — Paper PDF via browser** (universal fallback):
+**Source B — Paper PDF via browser** (MANDATORY when Source A yields < 3 figures):
 1. Use `browser` to navigate to `https://arxiv.org/pdf/{PAPER_ID}`
-2. Screenshot pages containing figures
-3. Each screenshot captures the figure with its caption
+2. **Page 1-2**: Almost always contains the main figure (architecture/overview diagram). Screenshot it.
+3. **Scroll through the entire PDF**: screenshot every page that contains a figure, diagram, or results table
+4. Key figures to capture:
+   - **Fig. 1 / Main figure**: The paper's overview/architecture diagram (usually page 1-3)
+   - **Results figures**: Bar charts, line plots, comparison tables (usually in Experiments section)
+   - **Method diagrams**: Algorithm flowcharts, model architecture details
+   - **Ablation figures**: Performance under different settings
+5. Each browser screenshot produces a URL that can be embedded in Notion via `![caption](screenshot_url)`
+6. Aim for **5-8 screenshots** covering all major visual content in the paper
 
 **Source C — AlphaXiv** (pre-extracted):
 ```
@@ -51,6 +58,8 @@ Many papers have official code repos with figures in a `figures/` or `assets/` d
 4. This source is especially useful when arXiv HTML is unavailable (papers before ~2023 or very new papers where HTML hasn't been generated yet)
 
 **Source priority order**: arXiv HTML → GitHub repo → PDF browser screenshots → Semantic Scholar/PapersWithCode
+
+**IMPORTANT**: PDF browser screenshots are NOT just a fallback — they are the most reliable source because EVERY arXiv paper has a PDF. If arXiv HTML and GitHub together yield fewer than 3 figures, you MUST use browser screenshots. Aim for the paper's main figure (Fig. 1) at minimum.
 
 ### Step 2: Extract figures with metadata
 

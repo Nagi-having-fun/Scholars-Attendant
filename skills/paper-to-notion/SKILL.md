@@ -223,16 +223,22 @@ Follow this concrete fetch sequence:
 3. **`web_fetch` on `https://arxiv.org/html/{PAPER_ID}`** — Get individual figure image URLs (look for `<img>` tags with `src` like `/html/{ID}/extracted/figures/*.png`). If 404, proceed to next source.
 4. **`web_search` for `"{paper title}" github`** — Find the official repo. Many papers have high-quality figures at `github.com/{org}/{repo}/raw/main/figures/*.png`. Fetch the repo README to find figure URLs.
 5. **`web_fetch` on `https://arxiv.org/abs/{PAPER_ID}`** — Get metadata (authors, date, categories) if not already known.
-6. **PDF via `browser`** — Fallback for figures when HTML and GitHub are unavailable.
+6. **PDF via `browser`** — **MANDATORY if steps 3+4 yielded fewer than 3 figures**:
+   - `browser action=navigate url="https://arxiv.org/pdf/{PAPER_ID}"`
+   - `browser action=screenshot` — capture page 1 (usually has main figure / architecture diagram)
+   - `browser action=scroll_down` + `browser action=screenshot` — repeat for every page with a figure or table
+   - **Aim for 5-8 screenshots** covering: main figure (Fig. 1), method diagrams, results plots, ablation charts
+   - Each screenshot URL is directly embeddable in Notion: `![Fig. N: caption](screenshot_url)`
 
 After gathering, you should have:
 - [ ] Paper title, authors, date, venue
-- [ ] Abstract / TL;DR
+- [ ] VERBATIM abstract text
+- [ ] VERBATIM introduction text
 - [ ] Section structure (headings)
 - [ ] All equations with numbering
-- [ ] All figures with direct image URLs and captions (aim for **all** figures in the paper, not just 1-2)
+- [ ] **≥5 figures** with direct image URLs and captions — main figure (Fig. 1) is NON-NEGOTIABLE
 - [ ] All tables with **complete data** — every row, every column, every number (from AlphaXiv full text)
-- [ ] Reference list with URLs
+- [ ] **ALL references** from the paper with URLs
 
 **If you don't have figures**: you MUST try at least 3 sources before giving up. Missing figures dramatically reduces page quality.
 **If you don't have complete tables**: fetch AlphaXiv full text (`/abs/{ID}.md`). The overview endpoint summarizes tables; only the full text has complete data.

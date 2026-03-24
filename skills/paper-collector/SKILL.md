@@ -219,11 +219,27 @@ You MUST complete ALL of these fetch steps before writing. Do them in parallel w
 2. **Fetch AlphaXiv full text** — `web_fetch` on `https://alphaxiv.org/abs/{PAPER_ID}.md`
    - This contains **complete table data** (all rows, all columns). Without it, your tables will be incomplete.
    - If 404: report to user, fall back to extracting table data from arXiv HTML or abstract.
-3. **Fetch figures** — try ALL sources in order, stop when you have ≥3 figures:
-   - `web_fetch` on `https://arxiv.org/html/{PAPER_ID}` — extract `<img>` tags with figure URLs
-   - `web_search` for `"{paper title}" github` — find repo, look for figures in README
-   - If both fail: use `browser` to screenshot the PDF at `https://arxiv.org/pdf/{PAPER_ID}`
-   - **Report to user what you found**: "Found {N} figures from {source}."
+3. **Fetch figures** — you MUST try ALL sources. Do NOT stop after one source:
+
+   **Source A — arXiv HTML** (best quality, individual images):
+   - `web_fetch` on `https://arxiv.org/html/{PAPER_ID}` — look for `<img>` tags with `src` containing `/extracted/figures/` or `/x*.png`
+   - Extract all figure URLs and their captions from `<figcaption>` elements
+
+   **Source B — GitHub repo** (often has high-quality figures):
+   - `web_search` for `"{paper title}" github`
+   - Fetch the repo README — figures are usually embedded there
+   - Figure URLs follow: `https://github.com/{org}/{repo}/raw/main/figures/{name}.png`
+
+   **Source C — PDF browser screenshots** (MANDATORY if Sources A+B yield < 3 figures):
+   - Navigate to `https://arxiv.org/pdf/{PAPER_ID}` with `browser`
+   - **Screenshot pages 1-2** (usually contains the main architecture/overview figure)
+   - **Scroll through the PDF** and screenshot every page that contains a figure or table
+   - Aim to capture: the main figure (Fig. 1), results plots, architecture diagrams, comparison tables
+   - Each screenshot becomes an embeddable image in the Notion page
+
+   **Minimum requirement: ≥3 figures** (main architecture figure + at least 2 results/comparison figures).
+   If you have 0 figures after trying all 3 sources, you MUST report this to the user.
+   **Report to user what you found**: "Found {N} figures from {source}."
 
 #### 6b: Compose English blog page
 
