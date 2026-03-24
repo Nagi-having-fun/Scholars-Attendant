@@ -222,20 +222,29 @@ You MUST complete ALL of these fetch steps before writing. Do them in parallel w
 3. **Fetch figures** — you MUST try ALL sources. Do NOT stop after one source:
 
    **Source A — arXiv HTML** (best quality, individual images):
-   - `web_fetch` on `https://arxiv.org/html/{PAPER_ID}` — look for `<img>` tags with `src` containing `/extracted/figures/` or `/x*.png`
-   - Extract all figure URLs and their captions from `<figcaption>` elements
+   - `web_fetch` on `https://arxiv.org/html/{PAPER_ID}`
+   - In the returned content, look for image URLs matching these patterns:
+     - `https://arxiv.org/html/{PAPER_ID}/extracted/figures/*.png`
+     - `https://arxiv.org/html/{PAPER_ID}/x*.png`
+     - Any `<img src="...">` or `![...](...)` in the response
+   - If web_fetch returns markdown, look for `![caption](url)` patterns
+   - If web_fetch returns HTML, use `extract_page_images` tool to extract all image URLs
+   - Extract captions from `<figcaption>` or surrounding text
+   - Construct full image URLs: `https://arxiv.org/html/{PAPER_ID}/` + relative path
 
    **Source B — GitHub repo** (often has high-quality figures):
    - `web_search` for `"{paper title}" github`
    - Fetch the repo README — figures are usually embedded there
    - Figure URLs follow: `https://github.com/{org}/{repo}/raw/main/figures/{name}.png`
 
-   **Source C — PDF browser screenshots** (MANDATORY if Sources A+B yield < 3 figures):
+   **Source C — ar5iv (alternative HTML renderer, try if Source A returns 404):**
+   - `web_fetch` on `https://ar5iv.labs.arxiv.org/html/{PAPER_ID}` — same approach as Source A
+   - ar5iv sometimes has HTML for papers that arxiv.org/html doesn't
+
+   **Source D — PDF browser screenshots** (try if Sources A+B+C yield 0 figures AND browser is available):
    - Navigate to `https://arxiv.org/pdf/{PAPER_ID}` with `browser`
-   - **Screenshot pages 1-2** (usually contains the main architecture/overview figure)
-   - **Scroll through the PDF** and screenshot every page that contains a figure or table
-   - Capture ALL figures the paper contains — scroll through the entire PDF, don't stop early
-   - Each screenshot becomes an embeddable image in the Notion page
+   - Screenshot every page that contains a figure
+   - NOTE: browser may not be available in Docker environments. If browser fails, proceed without screenshots and report to user.
 
    **Goal: capture ALL figures that exist in the paper** — not a fixed number. If the paper has 4 figures, get all 4. If it has 12, get all 12.
    If you have 0 figures after trying all 3 sources, you MUST report this to the user.

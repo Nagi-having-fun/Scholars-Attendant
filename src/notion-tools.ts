@@ -470,7 +470,7 @@ export function createNotionWritePageTool(params: {
           };
         }
 
-        // Reject content with 0 images — agent must use browser to screenshot PDF
+        // Reject content with 0 images — agent must find figures
         if (imageCount === 0) {
           logger.warn(
             `Quality gate: rejected 0 images for page ${pageId} (${blocks.length} blocks)`,
@@ -482,12 +482,23 @@ export function createNotionWritePageTool(params: {
                 text:
                   `REJECTED: No images found (${blocks.length} blocks, 0 figures). ` +
                   `A blog-style summary MUST include the paper's figures.\n\n` +
-                  `You MUST use the browser tool to screenshot figures from the PDF:\n` +
-                  `1. browser action=navigate url="https://arxiv.org/pdf/{PAPER_ID}"\n` +
-                  `2. browser action=screenshot  (capture page 1 — usually has the main figure)\n` +
-                  `3. browser action=scroll_down then browser action=screenshot  (repeat for each page with figures)\n` +
-                  `4. Use each screenshot URL in your markdown: ![Fig. N: caption](screenshot_url)\n\n` +
-                  `Then recompose the markdown with the figure images embedded and call this tool again.`,
+                  `To find figures, try these methods IN ORDER:\n\n` +
+                  `Method 1 — arXiv HTML (most reliable):\n` +
+                  `  web_fetch https://arxiv.org/html/{PAPER_ID}\n` +
+                  `  Look for <img> tags. Figure URLs are typically:\n` +
+                  `  https://arxiv.org/html/{PAPER_ID}/extracted/figures/figure1.png\n` +
+                  `  https://arxiv.org/html/{PAPER_ID}/x1.png\n` +
+                  `  Use each URL: ![Fig. 1: caption](https://arxiv.org/html/{PAPER_ID}/...)\n\n` +
+                  `Method 2 — GitHub repo:\n` +
+                  `  web_search "{paper title}" github\n` +
+                  `  Fetch README, find figure URLs like: github.com/{org}/{repo}/raw/main/figures/...\n\n` +
+                  `Method 3 — ar5iv (alternative HTML renderer):\n` +
+                  `  web_fetch https://ar5iv.labs.arxiv.org/html/{PAPER_ID}\n` +
+                  `  Same approach as Method 1.\n\n` +
+                  `Method 4 — Browser PDF screenshots (if browser is available):\n` +
+                  `  browser action=navigate url="https://arxiv.org/pdf/{PAPER_ID}"\n` +
+                  `  browser action=screenshot (repeat for each page with figures)\n\n` +
+                  `Then recompose the markdown with figure images and call this tool again.`,
               },
             ],
           };
