@@ -470,10 +470,27 @@ export function createNotionWritePageTool(params: {
           };
         }
 
-        if (imageCount === 0 && blocks.length < 50) {
+        // Reject content with 0 images — agent must use browser to screenshot PDF
+        if (imageCount === 0) {
           logger.warn(
-            `Quality warning: ${blocks.length} blocks, 0 images for page ${pageId}`,
+            `Quality gate: rejected 0 images for page ${pageId} (${blocks.length} blocks)`,
           );
+          return {
+            content: [
+              {
+                type: "text" as const,
+                text:
+                  `REJECTED: No images found (${blocks.length} blocks, 0 figures). ` +
+                  `A blog-style summary MUST include the paper's figures.\n\n` +
+                  `You MUST use the browser tool to screenshot figures from the PDF:\n` +
+                  `1. browser action=navigate url="https://arxiv.org/pdf/{PAPER_ID}"\n` +
+                  `2. browser action=screenshot  (capture page 1 — usually has the main figure)\n` +
+                  `3. browser action=scroll_down then browser action=screenshot  (repeat for each page with figures)\n` +
+                  `4. Use each screenshot URL in your markdown: ![Fig. N: caption](screenshot_url)\n\n` +
+                  `Then recompose the markdown with the figure images embedded and call this tool again.`,
+              },
+            ],
+          };
         }
 
         // Clear existing content if requested
@@ -594,6 +611,25 @@ export function createNotionCreateChildPageTool(params: {
                   `All references must be preserved. ` +
                   `Take the English markdown and translate every paragraph to Chinese while keeping ` +
                   `all formatting, image URLs, table data, and equations intact.`,
+              },
+            ],
+          };
+        }
+
+        // Reject child page with 0 images — it should mirror the English page's figures
+        if (imageCount === 0) {
+          logger.warn(
+            `Quality gate: rejected child page "${title}" with 0 images (${blocks.length} blocks)`,
+          );
+          return {
+            content: [
+              {
+                type: "text" as const,
+                text:
+                  `REJECTED: No images found (${blocks.length} blocks, 0 figures). ` +
+                  `The Chinese page must include the same figure images as the English page. ` +
+                  `Copy all ![caption](url) lines from the English markdown, translate only the caption text, ` +
+                  `and keep the image URLs identical. Then call this tool again.`,
               },
             ],
           };
