@@ -1,4 +1,4 @@
-import type { PaperMetadata } from "./types.js";
+import type { PaperMetadata, BatchSaveResult } from "./types.js";
 
 const NOTION_API_VERSION = "2022-06-28";
 const NOTION_BASE_URL = "https://api.notion.com/v1";
@@ -102,6 +102,12 @@ export async function savePaperToNotion(params: {
     properties.Published = { date: { start: paper.publishedDate } };
   }
 
+  if (paper.notes) {
+    properties["备注"] = {
+      rich_text: [{ type: "text", text: { content: truncate(paper.notes) } }],
+    };
+  }
+
   const body = { parent: { database_id: databaseId }, properties };
 
   const response = await fetch(`${NOTION_BASE_URL}/pages`, {
@@ -117,6 +123,64 @@ export async function savePaperToNotion(params: {
 
   const data = (await response.json()) as { id: string; url: string };
   return { pageId: data.id, url: data.url };
+}
+
+/** Batch save multiple papers with rate limiting and dedup. */
+export async function batchSavePapers(params: {
+  token: string;
+  databaseId: string;
+  papers: PaperMetadata[];
+  delayMs?: number;
+}): Promise<BatchSaveResult> {
+  const { token, databaseId, papers, delayMs = 350 } = params;
+  const result: BatchSaveResult = {
+    total: papers.length,
+    succeeded: 0,
+    failed: 0,
+    skipped: 0,
+    results: [],
+  };
+
+  for (const paper of papers) {
+    // Check for duplicates by source URL
+    if (paper.sourceUrl) {
+      try {
+        const exists = await findBySourceUrl({ token, databaseId, sourceUrl: paper.sourceUrl });
+        if (exists) {
+          result.skipped++;
+          result.results.push({ title: paper.title, status: "duplicate" });
+          continue;
+        }
+      } catch {
+        // Dedup check failed — continue with save attempt
+      }
+    }
+
+    try {
+      const saved = await savePaperToNotion({ token, databaseId, paper });
+      result.succeeded++;
+      result.results.push({
+        title: paper.title,
+        status: "saved",
+        pageId: saved.pageId,
+        url: saved.url,
+      });
+    } catch (err) {
+      result.failed++;
+      result.results.push({
+        title: paper.title,
+        status: "failed",
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+
+    // Rate limit: Notion API allows ~3 req/s
+    if (delayMs > 0) {
+      await new Promise((r) => setTimeout(r, delayMs));
+    }
+  }
+
+  return result;
 }
 
 /** Delete all child blocks of a page (to clear content). */

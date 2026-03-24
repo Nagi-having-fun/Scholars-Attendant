@@ -3,6 +3,7 @@ import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
 import { parseConfig } from "./src/config.js";
 import {
   createNotionSavePaperTool,
+  createNotionBatchSaveTool,
   createNotionSetupTool,
   createExtractPageImagesTool,
   createNotionWritePageTool,
@@ -36,6 +37,7 @@ const plugin = {
     }
 
     api.registerTool(createNotionSavePaperTool({ config, notionToken, logger }));
+    api.registerTool(createNotionBatchSaveTool({ config, notionToken, logger }));
     api.registerTool(createNotionSetupTool({ config, notionToken, logger }));
     api.registerTool(createExtractPageImagesTool({ logger }));
     api.registerTool(createNotionWritePageTool({ notionToken, logger }));

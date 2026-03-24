@@ -3,6 +3,7 @@ import {
   createDatabase,
   findBySourceUrl,
   savePaperToNotion,
+  batchSavePapers,
   clearPageContent,
   appendBlocks,
   createChildPage,
@@ -102,6 +103,12 @@ const NotionSavePaperSchema = {
       enum: ["Unread", "Reading", "Read"],
       description: "Reading status. Default: Unread.",
     },
+    notes: {
+      type: "string" as const,
+      description:
+        "Personal reading notes or relevance context (e.g., 'Must read — directly motivates our QRR probe'). " +
+        "Stored in the 备注 column.",
+    },
     database_id: {
       type: "string" as const,
       description: "Override database ID (uses config default if omitted).",
@@ -200,6 +207,7 @@ export function createNotionSavePaperTool(params: {
         tags: Array.isArray(rawParams.tags) ? rawParams.tags.map(String) : [],
         conference: (rawParams.conference as string) ?? "",
         status: ((rawParams.status as string) ?? "Unread") as PaperMetadata["status"],
+        notes: (rawParams.notes as string) ?? "",
       };
 
       try {
@@ -225,6 +233,174 @@ export function createNotionSavePaperTool(params: {
         return {
           content: [
             { type: "text" as const, text: `Failed to save paper to Notion: ${msg}` },
+          ],
+        };
+      }
+    },
+  };
+}
+
+// --- Batch save tool ---
+
+const NotionBatchSaveSchema = {
+  type: "object" as const,
+  additionalProperties: false,
+  required: ["papers"],
+  properties: {
+    papers: {
+      type: "array" as const,
+      description:
+        "Array of paper objects to save. Each paper has the same fields as notion_save_paper. " +
+        "Duplicates (by source_url) are automatically skipped.",
+      items: {
+        type: "object" as const,
+        additionalProperties: false,
+        required: ["title", "authors", "source_url", "summary", "tags"],
+        properties: {
+          title: { type: "string" as const, description: "Paper title." },
+          authors: { type: "string" as const, description: "Comma-separated author names." },
+          institutions: {
+            type: "array" as const,
+            items: { type: "string" as const },
+            description: "Institution abbreviations (e.g., ['MIT', 'Stanford']).",
+          },
+          published_date: {
+            type: "string" as const,
+            description: "Publication date YYYY-MM-DD.",
+          },
+          source_url: { type: "string" as const, description: "Original URL (arXiv, DOI, etc.)." },
+          paper_url: { type: "string" as const, description: "Direct paper link." },
+          summary: { type: "string" as const, description: "One-sentence summary." },
+          contributions: { type: "string" as const, description: "Main contributions (2-3 sentences)." },
+          tags: {
+            type: "array" as const,
+            items: { type: "string" as const },
+            description: "Mid-level research area tags.",
+          },
+          conference: { type: "string" as const, description: "Venue with year (e.g., 'ICLR 2025')." },
+          status: {
+            type: "string" as const,
+            enum: ["Unread", "Reading", "Read"],
+            description: "Reading status. Default: Unread.",
+          },
+          notes: {
+            type: "string" as const,
+            description: "Personal reading notes or relevance context.",
+          },
+        },
+      },
+    },
+    database_id: {
+      type: "string" as const,
+      description: "Override database ID (uses config default if omitted).",
+    },
+  },
+};
+
+export function createNotionBatchSaveTool(params: {
+  config: PaperCollectorConfig;
+  notionToken: string;
+  logger: {
+    info: (msg: string) => void;
+    warn: (msg: string) => void;
+    error: (msg: string) => void;
+  };
+}) {
+  const { config, notionToken, logger } = params;
+
+  return {
+    name: "notion_batch_save",
+    label: "Batch Save Papers to Notion",
+    description:
+      "Save multiple research papers to the Notion database in one call. " +
+      "Automatically deduplicates by source_url and rate-limits API calls. " +
+      "Use this when adding a reading list, survey papers, or multiple references at once.",
+    parameters: NotionBatchSaveSchema,
+    execute: async (_toolCallId: string, rawParams: Record<string, unknown>) => {
+      if (!notionToken) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: "Error: NOTION_API_TOKEN not configured.",
+            },
+          ],
+        };
+      }
+
+      const dbId =
+        (typeof rawParams.database_id === "string" && rawParams.database_id) ||
+        config.databaseId;
+      if (!dbId) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: "Error: No database ID configured. Run notion_setup first.",
+            },
+          ],
+        };
+      }
+
+      const rawPapers = rawParams.papers;
+      if (!Array.isArray(rawPapers) || rawPapers.length === 0) {
+        return {
+          content: [
+            { type: "text" as const, text: "Error: papers array is empty or invalid." },
+          ],
+        };
+      }
+
+      // Map raw params to PaperMetadata
+      const papers: PaperMetadata[] = rawPapers.map((p: Record<string, unknown>) => ({
+        title: (p.title as string) ?? "",
+        authors: (p.authors as string) ?? "",
+        institutions: Array.isArray(p.institutions) ? p.institutions.map(String) : [],
+        publishedDate: (p.published_date as string) ?? "",
+        sourceUrl: (p.source_url as string) ?? "",
+        paperUrl: (p.paper_url as string) ?? "",
+        summary: (p.summary as string) ?? "",
+        contributions: (p.contributions as string) ?? "",
+        tags: Array.isArray(p.tags) ? p.tags.map(String) : [],
+        conference: (p.conference as string) ?? "",
+        status: ((p.status as string) ?? "Unread") as PaperMetadata["status"],
+        notes: (p.notes as string) ?? "",
+      }));
+
+      logger.info(`Batch saving ${papers.length} papers to Notion...`);
+
+      try {
+        const result = await batchSavePapers({
+          token: notionToken,
+          databaseId: dbId,
+          papers,
+        });
+
+        // Build summary
+        const lines: string[] = [
+          `Batch save complete: ${result.succeeded} saved, ${result.skipped} duplicates skipped, ${result.failed} failed.`,
+          "",
+        ];
+
+        for (const r of result.results) {
+          const icon = r.status === "saved" ? "+" : r.status === "duplicate" ? "=" : "x";
+          const detail = r.url ? ` → ${r.url}` : r.error ? ` — ${r.error}` : "";
+          lines.push(`[${icon}] ${r.title}${detail}`);
+        }
+
+        logger.info(
+          `Batch save: ${result.succeeded}/${result.total} saved, ${result.skipped} skipped, ${result.failed} failed`,
+        );
+
+        return {
+          content: [{ type: "text" as const, text: lines.join("\n") }],
+        };
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        logger.error(`Batch save failed: ${msg}`);
+        return {
+          content: [
+            { type: "text" as const, text: `Batch save failed: ${msg}` },
           ],
         };
       }
