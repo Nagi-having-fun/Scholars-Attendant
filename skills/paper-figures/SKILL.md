@@ -57,9 +57,26 @@ Many papers have official code repos with figures in a `figures/` or `assets/` d
 3. Figure URLs follow the pattern: `https://github.com/{org}/{repo}/raw/main/figures/{name}.png`
 4. This source is especially useful when arXiv HTML is unavailable (papers before ~2023 or very new papers where HTML hasn't been generated yet)
 
-**Source priority order**: arXiv HTML → GitHub repo → PDF browser screenshots → Semantic Scholar/PapersWithCode
+**Source F — ar5iv** (arXiv HTML alternative, higher success rate):
+```
+https://ar5iv.labs.arxiv.org/html/{PAPER_ID}
+```
+ar5iv renders LaTeX source to HTML independently from arXiv's own `/html/` endpoint. Many papers that return 404 on `arxiv.org/html/` are available on ar5iv. Figure images are at:
+```
+https://ar5iv.labs.arxiv.org/html/{PAPER_ID}/assets/{filename}.png
+```
+Use `web_fetch` to get the page, then extract `<img>` tags. ar5iv figures are generally full-size composites (not fragments).
 
-**IMPORTANT**: PDF browser screenshots are NOT just a fallback — they are the most reliable source because EVERY arXiv paper has a PDF. If arXiv HTML and GitHub together yield fewer than 3 figures, you MUST use browser screenshots. Aim for the paper's main figure (Fig. 1) at minimum.
+**Source priority order**: PDF browser screenshots → GitHub repo → arXiv HTML → ar5iv → Semantic Scholar/PapersWithCode
+
+**CRITICAL — arXiv HTML image pitfall**: arXiv HTML often splits composite figures into tiny sub-images (legends, individual sub-panels, axis labels). These fragments are typically < 10KB and display as broken strips in Notion. The `notion_write_page` tool will REJECT images smaller than 10KB. **Do NOT use arXiv HTML `x*.png` URLs unless you verify they are complete, full-size figures (> 10KB).**
+
+**IMPORTANT**: PDF browser screenshots are the PREFERRED and most reliable source because:
+1. EVERY arXiv paper has a PDF
+2. Screenshots capture complete composite figures (not fragments)
+3. No risk of hallucinating URLs — browser screenshots produce real URLs
+
+Always try browser screenshots FIRST. Only fall back to arXiv HTML or GitHub if browser is unavailable.
 
 ### Step 2: Extract figures with metadata
 
@@ -115,7 +132,7 @@ The arXiv HTML version (`/html/` endpoint) is the best source for individual fig
    - `https://arxiv.org/html/{PAPER_ID}/x*.png`
 4. Captions are in `<figcaption>` elements or adjacent `<p>` tags
 
-If the HTML version is not available (older papers), fall back to Source B (browser screenshots).
+If the HTML version is not available (older papers), try ar5iv (`https://ar5iv.labs.arxiv.org/html/{PAPER_ID}`) first — it has much broader coverage than arXiv's own `/html/` endpoint. Fall back to Source B (browser screenshots) if ar5iv also fails.
 
 ## Notes
 

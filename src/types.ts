@@ -13,5 +13,6 @@ export type PaperMetadata = {
   summary: string;
   contributions: string;
   tags: string[];
+  conference: string;
   status: "Unread" | "Reading" | "Read";
 };

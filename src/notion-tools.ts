@@ -10,6 +10,56 @@ import {
 import { extractImagesFromHtml } from "./image-extract.js";
 import { markdownToBlocks } from "./markdown-to-blocks.js";
 
+/**
+ * Validate image URLs: reachable (HEAD) and not tiny fragments (< 10KB).
+ * arXiv HTML splits composite figures into sub-images (legends, sub-panels)
+ * that are often < 5KB and display as tiny strips in Notion.
+ */
+const MIN_IMAGE_BYTES = 10_000; // 10KB — real figures are typically 20KB+
+
+async function validateImageUrls(
+  blocks: Array<Record<string, unknown>>,
+): Promise<{
+  broken: Array<{ url: string; status: number | string }>;
+  tooSmall: Array<{ url: string; bytes: number }>;
+}> {
+  const imageBlocks = blocks.filter((b) => b.type === "image");
+  const broken: Array<{ url: string; status: number | string }> = [];
+  const tooSmall: Array<{ url: string; bytes: number }> = [];
+
+  await Promise.all(
+    imageBlocks.map(async (block) => {
+      const img = block.image as Record<string, unknown> | undefined;
+      const ext = img?.external as Record<string, unknown> | undefined;
+      const url = ext?.url as string | undefined;
+      if (!url) return;
+
+      try {
+        const resp = await fetch(url, {
+          method: "HEAD",
+          redirect: "follow",
+          signal: AbortSignal.timeout(8000),
+        });
+        if (!resp.ok) {
+          broken.push({ url, status: resp.status });
+          return;
+        }
+        const contentLength = Number(resp.headers.get("content-length") || 0);
+        if (contentLength > 0 && contentLength < MIN_IMAGE_BYTES) {
+          tooSmall.push({ url, bytes: contentLength });
+        }
+      } catch (err) {
+        broken.push({
+          url,
+          status: err instanceof Error ? err.message : "fetch failed",
+        });
+      }
+    }),
+  );
+
+  return { broken, tooSmall };
+}
+
 const NotionSavePaperSchema = {
   type: "object" as const,
   additionalProperties: false,
@@ -38,7 +88,14 @@ const NotionSavePaperSchema = {
       type: "array" as const,
       items: { type: "string" as const },
       description:
-        "Research area tags (e.g., LLM, reinforcement learning, computer vision).",
+        "Mid-level research area tags. Do NOT include: broad tags (LLM, NLP, deep learning), " +
+        "paper-specific names (TOFU, SimNPO, FLAT), or conference names (use 'conference' field instead).",
+    },
+    conference: {
+      type: "string" as const,
+      description:
+        "Conference or journal venue with year, e.g., 'NeurIPS 2025', 'ICLR 2026', 'ICML 2024', 'ACL 2025'. " +
+        "Leave empty if not published at a venue yet.",
     },
     status: {
       type: "string" as const,
@@ -141,6 +198,7 @@ export function createNotionSavePaperTool(params: {
         summary: rawParams.summary as string,
         contributions: rawParams.contributions as string,
         tags: Array.isArray(rawParams.tags) ? rawParams.tags.map(String) : [],
+        conference: (rawParams.conference as string) ?? "",
         status: ((rawParams.status as string) ?? "Unread") as PaperMetadata["status"],
       };
 
@@ -470,35 +528,57 @@ export function createNotionWritePageTool(params: {
           };
         }
 
-        // Reject content with 0 images — agent must find figures
+        // Warn (but allow) content with 0 images — some papers have no extractable figures online
         if (imageCount === 0) {
           logger.warn(
-            `Quality gate: rejected 0 images for page ${pageId} (${blocks.length} blocks)`,
+            `Quality gate: 0 images for page ${pageId} (${blocks.length} blocks) — allowing but warning`,
+          );
+        }
+
+        // Validate image URLs — reject if broken or tiny fragments
+        const { broken: brokenImages, tooSmall } = await validateImageUrls(blocks);
+        if (brokenImages.length > 0) {
+          const brokenList = brokenImages
+            .map((b) => `  - ${b.url} → ${b.status}`)
+            .join("\n");
+          logger.warn(
+            `Quality gate: ${brokenImages.length} broken image URL(s) for page ${pageId}:\n${brokenList}`,
           );
           return {
             content: [
               {
                 type: "text" as const,
                 text:
-                  `REJECTED: No images found (${blocks.length} blocks, 0 figures). ` +
-                  `A blog-style summary MUST include the paper's figures.\n\n` +
-                  `To find figures, try these methods IN ORDER:\n\n` +
-                  `Method 1 — arXiv HTML (most reliable):\n` +
-                  `  web_fetch https://arxiv.org/html/{PAPER_ID}\n` +
-                  `  Look for <img> tags. Figure URLs are typically:\n` +
-                  `  https://arxiv.org/html/{PAPER_ID}/extracted/figures/figure1.png\n` +
-                  `  https://arxiv.org/html/{PAPER_ID}/x1.png\n` +
-                  `  Use each URL: ![Fig. 1: caption](https://arxiv.org/html/{PAPER_ID}/...)\n\n` +
-                  `Method 2 — GitHub repo:\n` +
-                  `  web_search "{paper title}" github\n` +
-                  `  Fetch README, find figure URLs like: github.com/{org}/{repo}/raw/main/figures/...\n\n` +
-                  `Method 3 — ar5iv (alternative HTML renderer):\n` +
-                  `  web_fetch https://ar5iv.labs.arxiv.org/html/{PAPER_ID}\n` +
-                  `  Same approach as Method 1.\n\n` +
-                  `Method 4 — Browser PDF screenshots (if browser is available):\n` +
+                  `REJECTED: ${brokenImages.length} image URL(s) are broken (404 or unreachable):\n${brokenList}\n\n` +
+                  `DO NOT guess or fabricate image URLs. You must verify each URL exists before using it.\n\n` +
+                  `How to find REAL figure URLs:\n` +
+                  `1. Use browser to screenshot the PDF pages that contain figures (PREFERRED)\n` +
+                  `2. web_fetch the arXiv HTML page and extract ACTUAL <img> src attributes\n` +
+                  `3. web_fetch the GitHub repo README and extract ACTUAL image URLs\n` +
+                  `4. If no real URLs exist, submit content without those figures\n\n` +
+                  `Fix the broken URLs or remove them, then call this tool again.`,
+              },
+            ],
+          };
+        }
+        if (tooSmall.length > 0) {
+          const smallList = tooSmall
+            .map((s) => `  - ${s.url} → ${s.bytes} bytes`)
+            .join("\n");
+          logger.warn(
+            `Quality gate: ${tooSmall.length} tiny image(s) for page ${pageId}:\n${smallList}`,
+          );
+          return {
+            content: [
+              {
+                type: "text" as const,
+                text:
+                  `REJECTED: ${tooSmall.length} image(s) are too small (< 10KB) and are likely arXiv HTML sub-image fragments, not complete figures:\n${smallList}\n\n` +
+                  `arXiv HTML often splits composite figures into tiny sub-images (legends, sub-panels) that display as broken strips in Notion.\n\n` +
+                  `Instead, use the browser tool to screenshot figures directly from the PDF:\n` +
                   `  browser action=navigate url="https://arxiv.org/pdf/{PAPER_ID}"\n` +
-                  `  browser action=screenshot (repeat for each page with figures)\n\n` +
-                  `Then recompose the markdown with figure images and call this tool again.`,
+                  `  browser action=screenshot (capture each page with figures)\n\n` +
+                  `Remove the tiny fragment URLs and replace them with browser screenshots or full-size images, then call this tool again.`,
               },
             ],
           };
@@ -627,20 +707,49 @@ export function createNotionCreateChildPageTool(params: {
           };
         }
 
-        // Reject child page with 0 images — it should mirror the English page's figures
+        // Warn (but allow) child page with 0 images
         if (imageCount === 0) {
           logger.warn(
-            `Quality gate: rejected child page "${title}" with 0 images (${blocks.length} blocks)`,
+            `Quality gate: 0 images for child page "${title}" (${blocks.length} blocks) — allowing but warning`,
+          );
+        }
+
+        // Validate image URLs — reject if broken or tiny fragments
+        const { broken: brokenImages, tooSmall } = await validateImageUrls(blocks);
+        if (brokenImages.length > 0) {
+          const brokenList = brokenImages
+            .map((b) => `  - ${b.url} → ${b.status}`)
+            .join("\n");
+          logger.warn(
+            `Quality gate: ${brokenImages.length} broken image URL(s) for child page "${title}":\n${brokenList}`,
           );
           return {
             content: [
               {
                 type: "text" as const,
                 text:
-                  `REJECTED: No images found (${blocks.length} blocks, 0 figures). ` +
-                  `The Chinese page must include the same figure images as the English page. ` +
-                  `Copy all ![caption](url) lines from the English markdown, translate only the caption text, ` +
-                  `and keep the image URLs identical. Then call this tool again.`,
+                  `REJECTED: ${brokenImages.length} image URL(s) are broken:\n${brokenList}\n\n` +
+                  `Use the same verified image URLs from the English page.\n` +
+                  `Fix or remove the broken URLs, then call this tool again.`,
+              },
+            ],
+          };
+        }
+        if (tooSmall.length > 0) {
+          const smallList = tooSmall
+            .map((s) => `  - ${s.url} → ${s.bytes} bytes`)
+            .join("\n");
+          logger.warn(
+            `Quality gate: ${tooSmall.length} tiny image(s) for child page "${title}":\n${smallList}`,
+          );
+          return {
+            content: [
+              {
+                type: "text" as const,
+                text:
+                  `REJECTED: ${tooSmall.length} image(s) are too small (< 10KB) — likely arXiv HTML fragments:\n${smallList}\n\n` +
+                  `Use the same full-size image URLs from the English page, or browser PDF screenshots.\n` +
+                  `Remove tiny fragments and call this tool again.`,
               },
             ],
           };

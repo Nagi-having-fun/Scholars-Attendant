@@ -190,13 +190,17 @@ Combine information from the original source AND the paper's actual page:
 
 - **title**: The paper's actual English title
 - **authors**: Author names from the paper page, comma-separated
-- **institutions**: An array of institution tags for the **first author** and **corresponding author** (last author or marked with *). Use short, standard abbreviations (e.g., "MIT", "Stanford", "ETH Zurich", "Tsinghua University", "CMU", "UIUC", "UC Berkeley"). If the same institution applies to both, include it only once.
+- **institutions**: An array of institution tags for the **first author** and **corresponding author** (last author or marked with *). **ALWAYS use short abbreviations** — e.g., "MIT", "Stanford", "ETH", "THU" (Tsinghua), "PKU" (Peking), "CMU", "UIUC", "MSR" (Microsoft Research), "UCSC", "GaTech", "UW" (Washington), "MSU" (Michigan State), "CAS" (Chinese Academy of Sciences), "SJTU" (Shanghai Jiao Tong), "UMass", "AI2" (Allen Institute), "CAIS" (Center for AI Safety), "TUM" (TU Munich). Never use full names like "University of XXX" — always abbreviate.
 - **published_date**: In YYYY-MM-DD format if available
 - **source_url**: The original URL the user sent
 - **paper_url**: Direct link to the paper itself (arXiv abs page, DOI URL, etc.)
 - **summary**: One-sentence summary of what the paper does
 - **contributions**: 2-3 sentences on main contributions
-- **tags**: English research area tags (e.g., "LLM", "diffusion model", "reinforcement learning", "computer vision", "NLP", "robotics")
+- **tags**: English research area tags. **Tag hygiene rules:**
+  - **Do NOT use overly broad tags** like "LLM", "NLP", "deep learning", "computer vision" — these apply to almost every paper and add no filtering value.
+  - **Do NOT use paper-specific tags** like method names ("SimNPO", "FLAT"), dataset names ("TOFU", "MUSE", "WMDP"), or benchmark names that only relate to one paper — use general category tags instead (e.g., "machine unlearning", "benchmark", "preference optimization").
+  - **Do NOT put conference/venue names in tags** — use the separate `conference` field on the database instead.
+  - **Good tags** are mid-level research topics: "machine unlearning", "agent memory", "reinforcement learning", "preference optimization", "knowledge tracing", "dialogue tutoring", "benchmark", "survey", etc.
 
 ### Step 5: Save to Notion
 
@@ -221,33 +225,28 @@ You MUST complete ALL of these fetch steps before writing. Do them in parallel w
    - If 404: report to user, fall back to extracting table data from arXiv HTML or abstract.
 3. **Fetch figures** — you MUST try ALL sources. Do NOT stop after one source:
 
-   **Source A — arXiv HTML** (best quality, individual images):
-   - `web_fetch` on `https://arxiv.org/html/{PAPER_ID}`
-   - In the returned content, look for image URLs matching these patterns:
-     - `https://arxiv.org/html/{PAPER_ID}/extracted/figures/*.png`
-     - `https://arxiv.org/html/{PAPER_ID}/x*.png`
-     - Any `<img src="...">` or `![...](...)` in the response
-   - If web_fetch returns markdown, look for `![caption](url)` patterns
-   - If web_fetch returns HTML, use `extract_page_images` tool to extract all image URLs
-   - Extract captions from `<figcaption>` or surrounding text
-   - Construct full image URLs: `https://arxiv.org/html/{PAPER_ID}/` + relative path
+   **Source A — PDF browser screenshots (PREFERRED — most reliable):**
+   - Navigate to `https://arxiv.org/pdf/{PAPER_ID}` with `browser`
+   - Screenshot every page that contains a figure, diagram, or results chart
+   - This is the BEST source because: (1) every paper has a PDF, (2) screenshots capture complete composite figures, (3) no risk of URL hallucination
+   - Each screenshot produces a URL you can embed directly: `![Fig. N: caption](screenshot_url)`
 
    **Source B — GitHub repo** (often has high-quality figures):
    - `web_search` for `"{paper title}" github`
    - Fetch the repo README — figures are usually embedded there
    - Figure URLs follow: `https://github.com/{org}/{repo}/raw/main/figures/{name}.png`
 
-   **Source C — ar5iv (alternative HTML renderer, try if Source A returns 404):**
-   - `web_fetch` on `https://ar5iv.labs.arxiv.org/html/{PAPER_ID}` — same approach as Source A
-   - ar5iv sometimes has HTML for papers that arxiv.org/html doesn't
+   **Source C — arXiv HTML** (USE WITH CAUTION):
+   - `web_fetch` on `https://arxiv.org/html/{PAPER_ID}`
+   - **WARNING: arXiv HTML often splits composite figures into tiny sub-images (legends, sub-panels, axis labels) that are < 10KB each. The `notion_write_page` tool will REJECT images smaller than 10KB.**
+   - Only use arXiv HTML images if they are COMPLETE figures (> 10KB). Check by looking at the `<figure>` element — if it contains multiple `<img>` tags, those are fragments, NOT complete figures.
+   - If web_fetch returns image URLs, verify they are full figures before using them.
 
-   **Source D — PDF browser screenshots** (try if Sources A+B+C yield 0 figures AND browser is available):
-   - Navigate to `https://arxiv.org/pdf/{PAPER_ID}` with `browser`
-   - Screenshot every page that contains a figure
-   - NOTE: browser may not be available in Docker environments. If browser fails, proceed without screenshots and report to user.
+   **Source D — ar5iv (alternative HTML renderer):**
+   - `web_fetch` on `https://ar5iv.labs.arxiv.org/html/{PAPER_ID}` — same caution as Source C
 
    **Goal: capture ALL figures that exist in the paper** — not a fixed number. If the paper has 4 figures, get all 4. If it has 12, get all 12.
-   If you have 0 figures after trying all 3 sources, you MUST report this to the user.
+   If you have 0 figures after trying all sources, you MUST report this to the user.
    **Report to user what you found**: "Found {N} figures from {source} (paper contains approximately {M} figures total)."
 
 #### 6b: Compose English blog page

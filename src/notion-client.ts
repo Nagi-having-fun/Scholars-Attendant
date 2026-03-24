@@ -94,6 +94,10 @@ export async function savePaperToNotion(params: {
     Status: { select: { name: paper.status } },
   };
 
+  if (paper.conference) {
+    properties.Conference = { select: { name: paper.conference } };
+  }
+
   if (paper.publishedDate) {
     properties.Published = { date: { start: paper.publishedDate } };
   }
