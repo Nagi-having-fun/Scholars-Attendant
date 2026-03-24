@@ -321,6 +321,36 @@ export function markdownToBlocks(markdown: string): Block[] {
       continue;
     }
 
+    // Markdown pipe-style table: | col1 | col2 |
+    if (trimmed.startsWith("|") && trimmed.endsWith("|") && trimmed.includes("|", 1)) {
+      const mdTableRows: RichText[][][] = [];
+      let hasHeader = false;
+
+      while (i < lines.length) {
+        const tl = lines[i].trim();
+        if (!tl.startsWith("|") || !tl.endsWith("|")) break;
+
+        // Check if this is a separator row (|---|---|)
+        const isSeparator = /^\|[\s\-:|]+\|$/.test(tl);
+        if (isSeparator) {
+          hasHeader = mdTableRows.length > 0; // rows before separator are header
+          i++;
+          continue;
+        }
+
+        // Parse cells: split by | and trim, ignoring first/last empty
+        const rawCells = tl.split("|").slice(1, -1);
+        const cells: RichText[][] = rawCells.map((c) => parseInlineRichText(c.trim()));
+        mdTableRows.push(cells);
+        i++;
+      }
+
+      if (mdTableRows.length) {
+        blocks.push(tableBlock(mdTableRows, hasHeader, true));
+      }
+      continue;
+    }
+
     // Table block
     if (trimmed.startsWith("<table")) {
       const hasHeader = /header-row="true"/.test(trimmed);

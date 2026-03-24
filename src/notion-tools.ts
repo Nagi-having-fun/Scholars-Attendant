@@ -417,9 +417,10 @@ export function createNotionWritePageTool(params: {
     label: "Write Page Content to Notion",
     description:
       "Write a blog-style paper summary (headings, equations, figures, tables) to a Notion page. " +
-      "IMPORTANT: This tool REJECTS content shorter than 25 blocks. " +
-      "You MUST gather content from AlphaXiv (overview + full text), arXiv HTML, and GitHub " +
-      "BEFORE calling this tool. Include figures, complete tables, and detailed sections.",
+      "IMPORTANT: This tool REJECTS content shorter than 40 blocks. " +
+      "You MUST include: VERBATIM abstract, VERBATIM introduction, detailed method with equations, " +
+      "complete experiment tables (ALL rows/columns), figures, and ALL references. " +
+      "Tables can use markdown pipe syntax (| col1 | col2 |) or HTML <table> syntax.",
     parameters: NotionWritePageSchema,
     execute: async (_toolCallId: string, rawParams: Record<string, unknown>) => {
       if (!notionToken) {
@@ -445,7 +446,7 @@ export function createNotionWritePageTool(params: {
         const imageCount = blocks.filter(
           (b: Record<string, unknown>) => b.type === "image",
         ).length;
-        const MIN_BLOCKS = 25;
+        const MIN_BLOCKS = 40;
 
         if (blocks.length < MIN_BLOCKS) {
           logger.warn(
@@ -457,12 +458,12 @@ export function createNotionWritePageTool(params: {
                 type: "text" as const,
                 text:
                   `REJECTED: Content too short (${blocks.length} blocks, minimum ${MIN_BLOCKS}). ` +
-                  `A proper blog-style summary needs detailed sections with figures and tables.\n\n` +
+                  `A proper blog-style summary needs verbatim abstract, full introduction, detailed method, complete experiment tables, and all references.\n\n` +
                   `Before calling this tool again, you MUST:\n` +
                   `1. web_fetch https://alphaxiv.org/overview/{PAPER_ID}.md — structured overview\n` +
-                  `2. web_fetch https://alphaxiv.org/abs/{PAPER_ID}.md — complete table data (every row/column)\n` +
+                  `2. web_fetch https://alphaxiv.org/abs/{PAPER_ID}.md — complete table data (every row/column) and full text\n` +
                   `3. Search for figures: try arXiv HTML, GitHub repo (many papers have figures/ dir), or browser screenshots\n` +
-                  `4. Compose 2000-5000 words with: TL;DR, Background, Method (equations + figures), Experiments (result figures + data tables), Discussion, Key Takeaways, References\n\n` +
+                  `4. Compose 3000-8000 words with: TL;DR, VERBATIM Abstract, VERBATIM Introduction, Background, Method (equations + figures), Experiments (complete data tables), Discussion, Key Takeaways, ALL References\n\n` +
                   `Current content has ${imageCount} images. Aim for 3-5 figures from the paper.`,
               },
             ],
@@ -546,9 +547,9 @@ export function createNotionCreateChildPageTool(params: {
     label: "Create Child Page in Notion",
     description:
       "Create a Chinese translation sub-page under a Notion page. " +
-      "IMPORTANT: This tool REJECTS content shorter than 25 blocks. " +
-      "The Chinese page must be a FULL translation of the English page — same figures, tables, equations. " +
-      "NOT a short summary.",
+      "IMPORTANT: This tool REJECTS content shorter than 40 blocks. " +
+      "The Chinese page must be a FULL translation of the English page — same figures, tables, equations, " +
+      "VERBATIM translated abstract and introduction, and ALL references. NOT a short summary.",
     parameters: NotionCreateChildPageSchema,
     execute: async (_toolCallId: string, rawParams: Record<string, unknown>) => {
       if (!notionToken) {
@@ -575,7 +576,7 @@ export function createNotionCreateChildPageTool(params: {
         const imageCount = blocks.filter(
           (b: Record<string, unknown>) => b.type === "image",
         ).length;
-        const MIN_BLOCKS = 25;
+        const MIN_BLOCKS = 40;
 
         if (blocks.length < MIN_BLOCKS) {
           logger.warn(
@@ -589,6 +590,8 @@ export function createNotionCreateChildPageTool(params: {
                   `REJECTED: Content too short (${blocks.length} blocks, minimum ${MIN_BLOCKS}). ` +
                   `The Chinese sub-page must be a FULL translation of the English page — ` +
                   `same sections, same figures (${imageCount} images found), same tables, same equations. ` +
+                  `Abstract and Introduction must be translated VERBATIM (word-for-word). ` +
+                  `All references must be preserved. ` +
                   `Take the English markdown and translate every paragraph to Chinese while keeping ` +
                   `all formatting, image URLs, table data, and equations intact.`,
               },

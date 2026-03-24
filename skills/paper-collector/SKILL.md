@@ -1,6 +1,6 @@
 ---
 name: paper-collector
-description: "MUST USE when the user sends any URL (arXiv, Xiaohongshu, WeChat, X/Twitter, GitHub, blog, etc.). Saves metadata via notion_save_paper, then generates a full blog-style Notion page (notion_write_page REJECTS content under 25 blocks — you MUST web_fetch AlphaXiv overview + full text + find figures BEFORE writing). Also creates a Chinese translation sub-page. Always read this skill before responding to messages containing URLs."
+description: "MUST USE when the user sends any URL (arXiv, Xiaohongshu, WeChat, X/Twitter, GitHub, blog, etc.). Saves metadata via notion_save_paper, then AUTOMATICALLY generates English + Chinese blog-style Notion pages (notion_write_page REJECTS content under 40 blocks). Pages must include VERBATIM abstract, VERBATIM introduction, complete tables, figures, and ALL references. Do NOT wait for user to ask — auto-generate immediately after saving metadata."
 ---
 
 # Paper Collector
@@ -229,14 +229,16 @@ You MUST complete ALL of these fetch steps before writing. Do them in parallel w
 
 **Quality standard (Keshav's two-pass reading depth)**: A reader of this page must be able to **summarize the paper's main thrust, with supporting evidence, to someone else** — without reading the original paper. This means detailed method explanation, complete results with specific numbers, and all key figures embedded.
 
-Write a **2000-5000 word** blog-style page with these sections:
+Write a **3000-8000 word** blog-style page with these sections:
 - **TL;DR** (1-2 sentences — the core contribution in plain language)
-- **Background** (2-3 paragraphs: what problem exists, what came before, what gap remains, what theoretical basis is used)
-- **Method** (detailed step-by-step: "The approach works by (1)..., (2)..., (3)..." — include architecture figures, key equations with explanation of each term, not just "they use a transformer")
-- **Experiments** (setup, results figures, **complete data tables with ALL rows/columns** — include specific numbers and comparisons, explain trends, not just "achieves SOTA")
+- **Abstract** (VERBATIM — copy word-for-word from the paper, do NOT paraphrase)
+- **Introduction** (VERBATIM — copy the full original introduction, preserving all paragraphs and citations)
+- **Background** (2-3 paragraphs: what problem exists, what came before, what gap remains)
+- **Method** (detailed step-by-step: "The approach works by (1)..., (2)..., (3)..." — include architecture figures, key equations with explanation of each term)
+- **Experiments** (setup, results figures, **complete data tables with ALL rows/columns** — use markdown pipe-style tables `| col | col |`, include specific numbers and comparisons)
 - **Discussion** (limitations, ablation studies, what doesn't work, open questions)
 - **Key Takeaways** (bulleted list of 5-8 concrete points)
-- **References** (numbered, hyperlinked)
+- **References** (ALL references from the paper, numbered, hyperlinked — not just the ones you cite)
 
 Call `notion_write_page` with the composed markdown.
 

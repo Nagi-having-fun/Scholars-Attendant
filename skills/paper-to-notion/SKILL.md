@@ -1,6 +1,6 @@
 ---
 name: paper-to-notion
-description: "Convert a research paper into a blog-style Notion page (Lilian Weng style). notion_write_page REJECTS content under 25 blocks — you MUST first web_fetch AlphaXiv overview + full text (for complete tables), find figures (arXiv HTML / GitHub repo / browser), then compose 2000-5000 words with embedded figures, tables, equations, and references. Also creates a Chinese translation sub-page with identical content."
+description: "Convert a research paper into a blog-style Notion page (Lilian Weng style). notion_write_page REJECTS content under 40 blocks — you MUST include VERBATIM abstract, VERBATIM introduction, complete tables (use markdown | pipe | syntax), figures, and ALL references. Compose 3000-8000 words. Also creates a Chinese translation sub-page with identical content and verbatim-translated abstract/introduction."
 ---
 
 # Paper to Notion — Blog-Style Paper Page
@@ -39,9 +39,14 @@ Icon: (paper emoji)
 # TL;DR
 [1-2 sentence summary of the paper's key contribution]
 
+# Abstract
+[VERBATIM original abstract — copy word-for-word from the paper, do NOT paraphrase or shorten]
+
+# Introduction
+[VERBATIM original introduction — copy the full text from the paper, preserving all paragraphs, citations, and structure. Do NOT summarize or shorten.]
+
 # Background
-[Context and motivation — what problem does this paper address?]
-[Key definitions and notation]
+[Context and motivation — prior work, key definitions, notation]
 
 # Method
 [Detailed methodology with equations and figures]
@@ -49,7 +54,7 @@ Icon: (paper emoji)
 
 # Experiments
 [Experimental setup]
-[Results tables and figures]
+[Results tables and figures — complete, with ALL rows and columns]
 [Key findings]
 
 # Discussion
@@ -59,7 +64,7 @@ Icon: (paper emoji)
 [Bulleted summary of the most important points]
 
 # References
-[Numbered reference list with hyperlinks]
+[COMPLETE numbered reference list with hyperlinks — include ALL references from the paper, not just the ones you cite in your summary]
 ```
 
 ## Notion Formatting Rules
@@ -105,7 +110,15 @@ For figures that need emphasis, wrap in a callout:
 
 ### Tables
 
-Use Notion's table syntax for results tables:
+**PREFERRED: Use standard markdown pipe-style tables** (simpler, less error-prone):
+```
+| **Method** | **Accuracy** | **F1** |
+|------------|-------------|--------|
+| Baseline | 78.3 | 76.1 |
+| **Ours** | **82.7** | **80.4** |
+```
+
+Alternative: HTML-style tables (for complex layouts only):
 ```
 <table header-row="true" fit-page-width="true">
 	<tr>
@@ -336,16 +349,18 @@ Concretely, the reader must be able to answer ALL of these after reading only yo
 
 ### What "second-pass depth" looks like in practice:
 
+- **Abstract**: VERBATIM — copy the original abstract word-for-word. Do NOT paraphrase, shorten, or summarize. The Chinese page translates it fully.
+- **Introduction**: VERBATIM — copy the original introduction in full, preserving all paragraphs, citations, and logical flow. The Chinese page translates it fully.
 - **Method section**: Not "they use a transformer." Instead: "They propose X, which works by (1)..., (2)..., (3)... The key equation is $...$ where each term means..." Include architecture diagrams.
-- **Experiments section**: Not "they achieve SOTA." Instead: "On benchmark X, the method scores Y (vs. Z for the baseline), a N% improvement. Table 1 shows..." Include the full results table.
+- **Experiments section**: Not "they achieve SOTA." Instead: "On benchmark X, the method scores Y (vs. Z for the baseline), a N% improvement. Table 1 shows..." Include the full results table with ALL rows and columns.
 - **Figures**: Not a page without images. Instead: every key figure (architecture, results plots, ablation charts) embedded with a translated caption explaining what the reader should notice.
-- **Background**: Not skipped. Instead: 2-3 paragraphs of context — what came before, what problem remained unsolved, what theoretical framework is used.
+- **References**: COMPLETE — include ALL references from the paper as a numbered list with hyperlinks, not just the ones cited in your summary.
 
 ### Minimum content requirements:
 
-- **English page**: 2000-5000 words, ≥25 blocks, ≥3 figures
-- **Chinese sub-page**: 2000-5000 Chinese characters, ≥25 blocks, same figures/tables/equations as English. **NOT a summary — a full mirror.**
-- **Both pages must include**: all figures, all data tables, all equations, all callouts.
+- **English page**: 3000-8000 words, ≥40 blocks, ≥3 figures. Must include verbatim abstract and introduction.
+- **Chinese sub-page**: 3000-8000 Chinese characters, ≥40 blocks, same figures/tables/equations as English. **NOT a summary — a full mirror with verbatim-translated abstract and introduction.**
+- **Both pages must include**: all figures, all data tables, all equations, all callouts, all references.
 
 ## Content Guidelines
 
