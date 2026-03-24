@@ -227,7 +227,7 @@ Follow this concrete fetch sequence:
    - `browser action=navigate url="https://arxiv.org/pdf/{PAPER_ID}"`
    - `browser action=screenshot` — capture page 1 (usually has main figure / architecture diagram)
    - `browser action=scroll_down` + `browser action=screenshot` — repeat for every page with a figure or table
-   - **Aim for 5-8 screenshots** covering: main figure (Fig. 1), method diagrams, results plots, ablation charts
+   - **Capture ALL figures that exist in the paper** — scroll through the entire PDF and screenshot every page containing a figure
    - Each screenshot URL is directly embeddable in Notion: `![Fig. N: caption](screenshot_url)`
 
 After gathering, you should have:
@@ -236,7 +236,7 @@ After gathering, you should have:
 - [ ] VERBATIM introduction text
 - [ ] Section structure (headings)
 - [ ] All equations with numbering
-- [ ] **≥5 figures** with direct image URLs and captions — main figure (Fig. 1) is NON-NEGOTIABLE
+- [ ] **ALL figures from the paper** with direct image URLs and captions — capture every figure the paper contains, not a fixed number
 - [ ] All tables with **complete data** — every row, every column, every number (from AlphaXiv full text)
 - [ ] **ALL references** from the paper with URLs
 
@@ -364,7 +364,7 @@ Concretely, the reader must be able to answer ALL of these after reading only yo
 
 ### Minimum content requirements:
 
-- **English page**: 3000-8000 words, ≥40 blocks, ≥3 figures. Must include verbatim abstract and introduction.
+- **English page**: 3000-8000 words, ≥40 blocks. Must include verbatim abstract and introduction. Include ALL figures from the paper (not a fixed number — match what the paper actually contains).
 - **Chinese sub-page**: 3000-8000 Chinese characters, ≥40 blocks, same figures/tables/equations as English. **NOT a summary — a full mirror with verbatim-translated abstract and introduction.**
 - **Both pages must include**: all figures, all data tables, all equations, all callouts, all references.
 

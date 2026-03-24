@@ -234,12 +234,12 @@ You MUST complete ALL of these fetch steps before writing. Do them in parallel w
    - Navigate to `https://arxiv.org/pdf/{PAPER_ID}` with `browser`
    - **Screenshot pages 1-2** (usually contains the main architecture/overview figure)
    - **Scroll through the PDF** and screenshot every page that contains a figure or table
-   - Aim to capture: the main figure (Fig. 1), results plots, architecture diagrams, comparison tables
+   - Capture ALL figures the paper contains — scroll through the entire PDF, don't stop early
    - Each screenshot becomes an embeddable image in the Notion page
 
-   **Minimum requirement: ≥3 figures** (main architecture figure + at least 2 results/comparison figures).
+   **Goal: capture ALL figures that exist in the paper** — not a fixed number. If the paper has 4 figures, get all 4. If it has 12, get all 12.
    If you have 0 figures after trying all 3 sources, you MUST report this to the user.
-   **Report to user what you found**: "Found {N} figures from {source}."
+   **Report to user what you found**: "Found {N} figures from {source} (paper contains approximately {M} figures total)."
 
 #### 6b: Compose English blog page
 

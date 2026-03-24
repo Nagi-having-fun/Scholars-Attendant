@@ -39,7 +39,7 @@ https://arxiv.org/html/{PAPER_ID}/extracted/figures/figure1.png
    - **Method diagrams**: Algorithm flowcharts, model architecture details
    - **Ablation figures**: Performance under different settings
 5. Each browser screenshot produces a URL that can be embedded in Notion via `![caption](screenshot_url)`
-6. Aim for **5-8 screenshots** covering all major visual content in the paper
+6. **Capture ALL figures in the paper** — match the actual number, not a fixed target. If the paper has 4 figures, get 4. If it has 10, get 10.
 
 **Source C — AlphaXiv** (pre-extracted):
 ```
