@@ -288,7 +288,7 @@ Call `notion_write_page` with the composed markdown.
 
 The Chinese page must have the **same number of sections, figures, tables, and equations** as the English page. It must be **2000-5000 Chinese characters**. NOT a short summary — a full-depth mirror.
 
-Call `notion_create_child_page` with `parent_page_id` set to the page from Step 5, title "中文摘要 — {Chinese Title}", icon "🇨🇳".
+Call `notion_create_child_page` with `parent_page_id` set to the page from Step 5, title set to the **paper's original English title** (e.g., "Machine Unlearning"), icon "🇨🇳".
 
 **If rejected by quality gate**: same retry procedure as 6b.
 

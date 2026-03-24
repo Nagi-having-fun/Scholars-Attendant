@@ -295,7 +295,7 @@ If the database entry doesn't exist yet, create it first via `notion_save_paper`
 ```
 notion_create_child_page(
   parent_page_id="<page_id>",
-  title="中文摘要 — {Paper Title in Chinese}",
+  title="{Paper Title in English}",
   icon="🇨🇳",
   markdown="<full Chinese blog content>"
 )
