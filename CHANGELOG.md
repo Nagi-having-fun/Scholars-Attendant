@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.2.0] - 2026-03-31
+
+### Features
+- PDF local download: downloads PDFs directly to `~/Zotero/storage/<KEY>/` so they open in Zotero's built-in reader without cloud sync
+- Auto-detects local Zotero storage directory (macOS/Linux defaults, or `ZOTERO_STORAGE` env var)
+- Falls back to cloud-only attachment if local storage not found
+
+### Fixes
+- PDF attachments now use `imported_url` mode + local file, not `linked_url` (which just opens browser)
+- File download includes retry logic with exponential backoff
+
+### Design Rationale
+- Local-first approach: PDFs are downloaded to the exact directory Zotero expects, so no sync delay
+- Zero-dependency: uses only Python stdlib (urllib, hashlib, pathlib)
+
 ## [1.1.0] - 2026-03-31
 
 ### Features

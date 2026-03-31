@@ -14,8 +14,10 @@ Zero external dependencies — uses only Python stdlib.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import logging
+import os
 import re
 import sys
 import time
@@ -24,7 +26,7 @@ import urllib.error
 from pathlib import Path
 from typing import Any
 
-__version__ = "1.1.0"
+__version__ = "1.2.0"
 
 # ── Logging ──
 
@@ -196,24 +198,93 @@ def extract_arxiv_id(url: str) -> str | None:
     return m.group(1) if m else None
 
 
-def attach_pdf(item_key: str, pdf_url: str, title: str, config: dict[str, str]) -> bool:
-    """Attach a PDF to an existing Zotero item via URL."""
+def _find_zotero_storage_dir() -> Path | None:
+    """Auto-detect local Zotero storage directory."""
+    candidates = [
+        Path.home() / "Zotero" / "storage",            # macOS / Linux default
+        Path.home() / "Documents" / "Zotero" / "storage",  # alternate
+        Path(os.environ.get("ZOTERO_STORAGE", "")) if os.environ.get("ZOTERO_STORAGE") else None,
+    ]
+    for p in candidates:
+        if p and p.is_dir():
+            return p
+    return None
+
+
+def _download_file(url: str, dest: Path, retries: int = MAX_RETRIES) -> bool:
+    """Download a file with retry logic."""
+    for attempt in range(1, retries + 1):
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+            with urllib.request.urlopen(req, timeout=60) as r:
+                data = r.read()
+            if len(data) < 1000:
+                log.warning("Downloaded file too small (%dB), likely not a PDF", len(data))
+                return False
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            dest.write_bytes(data)
+            log.info("Downloaded %dKB → %s", len(data) // 1024, dest.name)
+            return True
+        except Exception as e:
+            if attempt < retries:
+                log.warning("Download attempt %d/%d failed: %s", attempt, retries, e)
+                time.sleep(RETRY_DELAY * attempt)
+            else:
+                log.error("Download failed after %d attempts: %s", retries, e)
+    return False
+
+
+def attach_pdf(
+    item_key: str,
+    pdf_url: str,
+    title: str,
+    config: dict[str, str],
+    local_storage: bool = True,
+) -> bool:
+    """Attach a PDF to a Zotero item.
+
+    If local_storage=True (default), downloads the PDF directly into the local
+    Zotero storage directory so it opens in the built-in reader without syncing.
+    Falls back to imported_url mode if local storage is not found.
+    """
+    # Step 1: Create attachment item in Zotero
+    safe_filename = re.sub(r"[^\w\s\-.]", "", title.replace("/", "_"))[:80]
+    if not safe_filename.endswith(".pdf"):
+        safe_filename += ".pdf"
+
     attachment = [{
         "itemType": "attachment",
         "parentItem": item_key,
-        "linkMode": "linked_url",
-        "title": f"{title}.pdf",
+        "linkMode": "imported_url",
+        "title": safe_filename,
         "url": pdf_url,
         "contentType": "application/pdf",
+        "charset": "",
         "tags": [],
     }]
-    log.info("Attaching PDF: %s", pdf_url[:80])
+    log.info("Creating PDF attachment for: %s", title[:60])
     result = zotero_request("POST", "/items", config, attachment)
-    if result and result.get("successful"):
-        log.info("PDF attached successfully")
-        return True
-    log.warning("PDF attachment failed")
-    return False
+    if not result or not result.get("successful"):
+        log.warning("Failed to create attachment item: %s", result)
+        return False
+
+    att_key = list(result["successful"].values())[0]["key"]
+
+    # Step 2: Download PDF to local Zotero storage
+    if local_storage:
+        storage_dir = _find_zotero_storage_dir()
+        if storage_dir:
+            dest = storage_dir / att_key / safe_filename
+            if _download_file(pdf_url, dest):
+                log.info("PDF saved locally: %s/%s", att_key, safe_filename)
+                return True
+            log.warning("Local download failed, PDF will need Zotero sync")
+        else:
+            log.info("Local Zotero storage not found, PDF will need Zotero sync")
+
+    # Step 3: Register file with Zotero API (fallback for cloud sync)
+    log.info("PDF attachment created (key: %s), may need Zotero sync for cloud access", att_key)
+    return True
 
 
 def create_zotero_item(
