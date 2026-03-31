@@ -16,6 +16,7 @@ An [OpenClaw](https://github.com/openclaw/openclaw) plugin that automatically de
 - **Progress reporting**: Sends status messages at each workflow step; never silently fails; reports detailed errors with fallback actions
 - **Notion integration**: Auto-saves to a Notion database with deduplication
 - **Multi-language support**: Handles Chinese/English content, always extracts English paper titles
+- **Zotero integration**: Sync papers to Zotero collections with duplicate checking, batch sync, and auto-created subcollections
 
 ## Skills
 
@@ -237,6 +238,41 @@ The `claude-code/skills/` directory contains adapted skill files:
 | `alphaxiv-lookup.md` | Fetch structured paper analysis from alphaxiv.org |
 | `paper-figures.md` | Extract and verify figure URLs from arXiv HTML |
 
+### Zotero Integration
+
+Sync papers from Notion to your Zotero library. Works with both Claude Code and OpenClaw.
+
+**Setup:**
+1. Get your API key from https://www.zotero.org/settings/keys (enable library + write access)
+2. Run `/zotero-setup` in Claude Code, or set the env vars for OpenClaw:
+   ```bash
+   export ZOTERO_API_KEY=your_key_here
+   export ZOTERO_USER_ID=your_user_id
+   ```
+3. Credentials are stored in `~/.scholars-attendant/zotero.json` (gitignored)
+
+**Commands:**
+| Command | Description |
+|---------|-------------|
+| `/zotero-setup` | First-time Zotero API configuration |
+| `/zotero list` | Show all Zotero collections |
+| `/zotero <paper title>` | Save a single paper from Notion to Zotero |
+| `/notion-to-zotero <source> → <collection>` | Batch sync a Notion table to a Zotero collection (deduplicates) |
+
+**What gets saved to Zotero:**
+- Title, authors (parsed into first/last name)
+- arXiv ID and repository metadata
+- Publication date, tags
+- Saved as "preprint" item type
+- Assigned to specified collection (creates subcollections if needed)
+
+**Example:**
+```
+/notion-to-zotero Unlearning → Unlearning
+# Syncs all papers from Notion "Unlearning" table to Zotero "Unlearning" collection
+# Skips papers already in Zotero
+```
+
 ### Key Differences from OpenClaw
 
 1. **No browser tool** — Claude Code can't take screenshots. For blocked pages (Xiaohongshu, WeChat), it uses alternate URL formats and `curl` with mobile User-Agent headers.
@@ -263,7 +299,12 @@ claude-code/
 ├── .claude/
 │   └── commands/
 │       ├── paper-setup.md           # /paper-setup — first-time Notion configuration
-│       └── paper.md                 # /paper <url> — run full collection pipeline
+│       ├── paper.md                 # /paper <url> — run full collection pipeline
+│       ├── zotero-setup.md          # /zotero-setup — first-time Zotero configuration
+│       ├── zotero.md                # /zotero <title> — save paper to Zotero
+│       └── notion-to-zotero.md      # /notion-to-zotero — batch sync Notion → Zotero
+├── scripts/
+│   └── notion-to-zotero.py         # Zotero API client (zero dependencies, stdlib only)
 └── skills/
     ├── paper-collector.md           # Full pipeline reference with tool mapping
     ├── alphaxiv-lookup.md           # AlphaXiv fetching reference

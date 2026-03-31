@@ -119,10 +119,50 @@ Page structure:
 3. **Full translation** — same sections, same figures, same tables, same equations
 4. Keep unchanged: image URLs, LaTeX, table data, reference URLs
 
-### Step 8: Report to User
+### Step 8: Save to Zotero (Optional)
+
+After completing the Notion pipeline, ask the user: "Want to save this to Zotero too? Which collection?"
+
+If yes, run the Zotero script:
+```bash
+python3 <repo>/claude-code/scripts/notion-to-zotero.py \
+  --title "Paper Title" \
+  --authors "Author1, Author2" \
+  --abstract "Summary" \
+  --url "https://arxiv.org/abs/..." \
+  --date "YYYY-MM-DD" \
+  --tags "tag1,tag2" \
+  --collection "Collection Name"
+```
+
+Zotero credentials are stored in `~/.scholars-attendant/zotero.json`. If the file doesn't exist, guide the user through `/zotero-setup`.
+
+### Step 9: Report to User
 
 - Paper title and authors
 - One-line summary
 - Notion link
+- Zotero collection (if saved)
 - Stats (blocks, figures)
 - Any errors encountered
+
+## Zotero Integration
+
+### Setup
+
+Zotero credentials are stored in `~/.scholars-attendant/zotero.json`:
+```json
+{
+  "api_key": "your_zotero_api_key",
+  "user_id": "your_zotero_user_id"
+}
+```
+
+Get these from https://www.zotero.org/settings/keys
+
+### Commands
+
+- `/zotero-setup` — Configure Zotero API credentials
+- `/zotero list` — Show all Zotero collections
+- `/zotero <paper title>` — Save a paper from Notion to Zotero
+- `/notion-to-zotero <collection>` — Batch sync a Notion database table to a Zotero collection (checks for duplicates first)
