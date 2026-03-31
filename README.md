@@ -185,16 +185,35 @@ This plugin can also be used with **Claude Code** (Anthropic's CLI for Claude) w
 
 ### Quick Start (Claude Code)
 
-1. **Ensure Notion MCP is connected** — Claude Code's built-in Notion integration handles database operations
-2. **Copy the skills** to your Claude Code project:
+1. **Clone this repo and enter the Claude Code directory:**
    ```bash
-   cp -r claude-code/skills/ ~/.claude/skills/scholars-attendant/
+   git clone https://github.com/Akutagawa1998/Scholars-Attendant.git
+   cd Scholars-Attendant/claude-code
    ```
-   Or reference them directly from this repo.
-3. **Find your Notion Database ID and Data Source ID:**
-   - Use the `notion-search` tool to find your "Paper Collection" database
-   - Use the `notion-fetch` tool on the database to get the `data_source_id` from `<data-source url="collection://...">` tags
-4. **Send a paper URL** via Discord channel (with `--channels` flag) or directly in the CLI
+
+2. **Start Claude Code in this directory:**
+   ```bash
+   claude
+   ```
+   Claude Code auto-loads `CLAUDE.md` with the full workflow instructions.
+
+3. **Run first-time setup:**
+   ```
+   /paper-setup
+   ```
+   This walks you through connecting Notion, finding/creating the Paper Collection database, and saving your config to `~/.scholars-attendant/config.json`.
+
+4. **Collect a paper:**
+   ```
+   /paper https://arxiv.org/abs/2310.07127
+   ```
+   Or just paste any paper URL — Claude will auto-detect and run the full pipeline.
+
+5. **Optional: Discord integration**
+   ```bash
+   claude --channels plugin:discord@claude-plugins-official
+   ```
+   Then send paper URLs via Discord and Claude will process them remotely.
 
 ### Claude Code Tool Mapping
 
@@ -236,14 +255,19 @@ Bot:  🔍 Fetching paper...
       Notion: https://www.notion.so/...
 ```
 
-### Project Structure (Claude Code Addition)
+### Project Structure (Claude Code)
 
 ```
 claude-code/
+├── CLAUDE.md                        # Auto-loaded by Claude Code — full workflow instructions
+├── .claude/
+│   └── commands/
+│       ├── paper-setup.md           # /paper-setup — first-time Notion configuration
+│       └── paper.md                 # /paper <url> — run full collection pipeline
 └── skills/
-    ├── paper-collector.md    # Full pipeline skill
-    ├── alphaxiv-lookup.md    # AlphaXiv fetching skill
-    └── paper-figures.md      # Figure extraction skill
+    ├── paper-collector.md           # Full pipeline reference with tool mapping
+    ├── alphaxiv-lookup.md           # AlphaXiv fetching reference
+    └── paper-figures.md             # Figure extraction reference
 ```
 
 ## License
