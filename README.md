@@ -179,6 +179,73 @@ Add this plugin to your OpenClaw configuration and set the `databaseId` in the p
     └── paper-to-notion/      # Blog-style Notion page generation
 ```
 
+## Claude Code Integration
+
+This plugin can also be used with **Claude Code** (Anthropic's CLI for Claude) without OpenClaw. Claude Code uses its native tools (Notion MCP, WebFetch, WebSearch) to replicate the same workflow.
+
+### Quick Start (Claude Code)
+
+1. **Ensure Notion MCP is connected** — Claude Code's built-in Notion integration handles database operations
+2. **Copy the skills** to your Claude Code project:
+   ```bash
+   cp -r claude-code/skills/ ~/.claude/skills/scholars-attendant/
+   ```
+   Or reference them directly from this repo.
+3. **Find your Notion Database ID and Data Source ID:**
+   - Use the `notion-search` tool to find your "Paper Collection" database
+   - Use the `notion-fetch` tool on the database to get the `data_source_id` from `<data-source url="collection://...">` tags
+4. **Send a paper URL** via Discord channel (with `--channels` flag) or directly in the CLI
+
+### Claude Code Tool Mapping
+
+| OpenClaw Tool | Claude Code Equivalent |
+|---|---|
+| `web_fetch` | `WebFetch` |
+| `web_search` | `WebSearch` / Exa `web_search_exa` |
+| `browser` (screenshots) | Not available — use `curl` via Bash + Exa `crawling_exa` |
+| `extract_page_images` | `WebFetch` + parse HTML |
+| `notion_save_paper` | `notion-create-pages` with `data_source_id` |
+| `notion_write_page` | `notion-update-page` with `replace_content` |
+| `notion_create_child_page` | `notion-create-pages` (parent `page_id`) + `notion-update-page` |
+
+### Claude Code Skills
+
+The `claude-code/skills/` directory contains adapted skill files:
+
+| Skill | Description |
+|---|---|
+| `paper-collector.md` | Full pipeline: URL → metadata → Notion → English blog → Chinese translation |
+| `alphaxiv-lookup.md` | Fetch structured paper analysis from alphaxiv.org |
+| `paper-figures.md` | Extract and verify figure URLs from arXiv HTML |
+
+### Key Differences from OpenClaw
+
+1. **No browser tool** — Claude Code can't take screenshots. For blocked pages (Xiaohongshu, WeChat), it uses alternate URL formats and `curl` with mobile User-Agent headers.
+2. **Notion content formatting** — Must use **real newlines** in content strings, never `\n` escape sequences (the Notion MCP renders them literally).
+3. **Multi-select properties** — Notion MCP requires exact option matches. New Institution/Tags values must be added via `notion-update-data-source` before use.
+4. **Discord integration** — Run Claude Code with `--channels plugin:discord@claude-plugins-official` to receive paper URLs via Discord.
+
+### Example Usage (Discord)
+
+```
+User: https://arxiv.org/abs/2310.07127
+Bot:  🔍 Fetching paper...
+      ✅ Metadata saved. Generating blog summary...
+      ✅ English page: 45 blocks, 8 figures
+      ✅ Chinese page: 42 blocks
+      Notion: https://www.notion.so/...
+```
+
+### Project Structure (Claude Code Addition)
+
+```
+claude-code/
+└── skills/
+    ├── paper-collector.md    # Full pipeline skill
+    ├── alphaxiv-lookup.md    # AlphaXiv fetching skill
+    └── paper-figures.md      # Figure extraction skill
+```
+
 ## License
 
 MIT
