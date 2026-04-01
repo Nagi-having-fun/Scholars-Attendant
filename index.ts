@@ -6,6 +6,7 @@ import {
   createNotionBatchSaveTool,
   createNotionSetupTool,
   createExtractPageImagesTool,
+  createExtractPaperFiguresTool,
   createNotionWritePageTool,
   createNotionCreateChildPageTool,
 } from "./src/notion-tools.js";
@@ -40,6 +41,7 @@ const plugin = {
     api.registerTool(createNotionBatchSaveTool({ config, notionToken, logger }));
     api.registerTool(createNotionSetupTool({ config, notionToken, logger }));
     api.registerTool(createExtractPageImagesTool({ logger }));
+    api.registerTool(createExtractPaperFiguresTool({ logger }));
     api.registerTool(createNotionWritePageTool({ notionToken, logger }));
     api.registerTool(createNotionCreateChildPageTool({ notionToken, logger }));
 

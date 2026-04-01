@@ -18,16 +18,13 @@ Extract figures, diagrams, and visual content from research papers and save them
 
 ### Step 1: Identify figure sources
 
-For arXiv papers, figures are typically available from multiple sources:
+For arXiv papers, **always start with the `extract_paper_figures` tool**:
 
-**Source A — arXiv HTML version** (best quality, individual images):
+**Source A — `extract_paper_figures` tool** (PREFERRED — programmatic extraction):
 ```
-https://arxiv.org/html/{PAPER_ID}
+extract_paper_figures(arxiv_id="{PAPER_ID}")
 ```
-Use `web_fetch` to get the HTML page. Extract `<img>` tags — arXiv HTML embeds individual figure images with URLs like:
-```
-https://arxiv.org/html/{PAPER_ID}/extracted/figures/figure1.png
-```
+This tool automatically fetches ar5iv and arXiv HTML pages, extracts all `<img>` tags, validates image sizes (≥10KB), and returns only usable full-size figure URLs. **Use this instead of manually parsing HTML with web_fetch** — web_fetch returns text, not raw HTML, so you cannot see `<img>` tags.
 
 **Source B — Paper PDF via browser** (MANDATORY when Source A yields < 3 figures):
 1. Use `browser` to navigate to `https://arxiv.org/pdf/{PAPER_ID}`
