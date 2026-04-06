@@ -609,6 +609,207 @@ export function createExtractPageImagesTool(params: {
   };
 }
 
+// --- Paper figure extraction tool ---
+
+const ExtractPaperFiguresSchema = {
+  type: "object" as const,
+  additionalProperties: false,
+  required: ["arxiv_id"],
+  properties: {
+    arxiv_id: {
+      type: "string" as const,
+      description:
+        "arXiv paper ID (e.g. '2305.00586' or '2506.12963'). " +
+        "The tool will try ar5iv HTML, then arXiv HTML, extract all figure image URLs, " +
+        "validate their size, and return only usable full-size figures.",
+    },
+  },
+};
+
+/**
+ * Programmatically extract paper figures from ar5iv/arxiv HTML.
+ * This replaces the unreliable pattern of asking the LLM to parse <img> tags
+ * from web_fetch output (which returns text, not raw HTML).
+ */
+export function createExtractPaperFiguresTool(params: {
+  logger: {
+    info: (msg: string) => void;
+    warn: (msg: string) => void;
+    error: (msg: string) => void;
+  };
+}) {
+  const { logger } = params;
+
+  return {
+    name: "extract_paper_figures",
+    label: "Extract Figures from Paper",
+    description:
+      "Extract all figure image URLs from an arXiv paper by programmatically fetching " +
+      "ar5iv and arXiv HTML pages and parsing <img> tags. Returns only validated, " +
+      "full-size figure URLs (≥10KB). Use this BEFORE writing to Notion — it replaces " +
+      "the manual process of web_fetch + parsing. If this tool returns 0 figures, " +
+      "use the browser tool to screenshot the PDF as a fallback.",
+    parameters: ExtractPaperFiguresSchema,
+    execute: async (_toolCallId: string, rawParams: Record<string, unknown>) => {
+      const arxivId = (rawParams.arxiv_id as string).trim();
+      if (!arxivId) {
+        return {
+          content: [
+            { type: "text" as const, text: "Error: arxiv_id is required." },
+          ],
+        };
+      }
+
+      const sources = [
+        {
+          name: "ar5iv",
+          url: `https://ar5iv.labs.arxiv.org/html/${arxivId}`,
+          baseUrl: `https://ar5iv.labs.arxiv.org/html/${arxivId}/`,
+        },
+        {
+          name: "arXiv HTML",
+          url: `https://arxiv.org/html/${arxivId}`,
+          baseUrl: `https://arxiv.org/html/${arxivId}/`,
+        },
+      ];
+
+      const allFigures: Array<{
+        url: string;
+        alt: string;
+        source: string;
+        bytes: number;
+      }> = [];
+      const seenUrls = new Set<string>();
+      const errors: string[] = [];
+
+      for (const src of sources) {
+        try {
+          logger.info(`Fetching ${src.name}: ${src.url}`);
+          const resp = await fetch(src.url, {
+            redirect: "follow",
+            signal: AbortSignal.timeout(15000),
+            headers: {
+              "User-Agent":
+                "Mozilla/5.0 (compatible; PaperCollector/1.0; +https://openclaw.ai)",
+            },
+          });
+          if (!resp.ok) {
+            errors.push(`${src.name}: HTTP ${resp.status}`);
+            continue;
+          }
+          const html = await resp.text();
+          if (html.length < 500) {
+            errors.push(`${src.name}: response too short (${html.length} chars)`);
+            continue;
+          }
+
+          // Extract images from raw HTML
+          const images = extractImagesFromHtml(html, {
+            limit: 30,
+            baseUrl: src.baseUrl,
+          });
+          logger.info(
+            `${src.name}: extracted ${images.length} candidate images`,
+          );
+
+          // Validate each image: HEAD request + size check
+          for (const img of images) {
+            if (seenUrls.has(img.url)) continue;
+            seenUrls.add(img.url);
+
+            try {
+              const headResp = await fetch(img.url, {
+                method: "HEAD",
+                redirect: "follow",
+                signal: AbortSignal.timeout(8000),
+              });
+              if (!headResp.ok) continue;
+
+              const contentLength = Number(
+                headResp.headers.get("content-length") || 0,
+              );
+              // Skip tiny fragments (< 10KB) — arXiv HTML splits figures
+              if (contentLength > 0 && contentLength < MIN_IMAGE_BYTES) continue;
+
+              // Accept: either size is unknown (0) or >= 10KB
+              allFigures.push({
+                url: img.url,
+                alt: img.alt,
+                source: src.name,
+                bytes: contentLength,
+              });
+            } catch {
+              // Skip unreachable images
+            }
+          }
+
+          // If we got enough figures from this source, stop
+          if (allFigures.length >= 3) {
+            logger.info(
+              `Found ${allFigures.length} valid figures from ${src.name}, skipping remaining sources`,
+            );
+            break;
+          }
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          errors.push(`${src.name}: ${msg}`);
+        }
+      }
+
+      if (allFigures.length === 0) {
+        const errSummary =
+          errors.length > 0 ? `\n\nSource errors:\n${errors.join("\n")}` : "";
+        logger.warn(
+          `No valid figures found for ${arxivId}. Errors: ${errors.join("; ")}`,
+        );
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text:
+                `No valid figures found from HTML sources for paper ${arxivId}.${errSummary}\n\n` +
+                `**You MUST use the browser tool to screenshot figures from the PDF:**\n` +
+                `1. browser action=navigate url="https://arxiv.org/pdf/${arxivId}"\n` +
+                `2. browser action=screenshot — capture page 1 (usually has the main figure)\n` +
+                `3. browser action=scroll_down + browser action=screenshot — repeat for every page with a figure\n` +
+                `4. Use the screenshot URLs as ![Figure N: caption](screenshot_url) in your markdown\n\n` +
+                `Also try:\n` +
+                `- web_search for "{paper title} github" — check repo README for figures\n` +
+                `- web_search for "{paper title} figures site:paperswithcode.com"`,
+            },
+          ],
+        };
+      }
+
+      const lines = allFigures.map((fig, i) => {
+        const sizeStr =
+          fig.bytes > 0 ? ` (${Math.round(fig.bytes / 1024)}KB)` : "";
+        const altStr = fig.alt ? `\n   Caption: ${fig.alt}` : "";
+        return `${i + 1}. ![Figure ${i + 1}${fig.alt ? `: ${fig.alt}` : ""}](${fig.url})${sizeStr}${altStr}\n   Source: ${fig.source}`;
+      });
+
+      logger.info(
+        `Found ${allFigures.length} valid figures for ${arxivId}`,
+      );
+
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text:
+              `Found ${allFigures.length} figure(s) for paper ${arxivId}:\n\n${lines.join("\n\n")}\n\n` +
+              `Use these image URLs in your Notion markdown as:\n` +
+              `![Fig. N: descriptive caption](url)\n\n` +
+              `If the paper has more figures than found above, supplement with browser PDF screenshots:\n` +
+              `  browser action=navigate url="https://arxiv.org/pdf/${arxivId}"\n` +
+              `  browser action=screenshot`,
+          },
+        ],
+      };
+    },
+  };
+}
+
 // --- Page content writing tools ---
 
 const NotionWritePageSchema = {
@@ -633,10 +834,17 @@ const NotionWritePageSchema = {
       type: "boolean" as const,
       description: "If true, clear existing page content before writing. Default: true.",
     },
+    include_images: {
+      type: "boolean" as const,
+      description:
+        "Whether to include images in the page. When false, image quality gates are skipped " +
+        "and the page can be written without figures. Default: uses plugin config (true).",
+    },
   },
 };
 
 export function createNotionWritePageTool(params: {
+  config: PaperCollectorConfig;
   notionToken: string;
   logger: {
     info: (msg: string) => void;
@@ -644,7 +852,7 @@ export function createNotionWritePageTool(params: {
     error: (msg: string) => void;
   };
 }) {
-  const { notionToken, logger } = params;
+  const { config, notionToken, logger } = params;
 
   return {
     name: "notion_write_page",
@@ -671,6 +879,9 @@ export function createNotionWritePageTool(params: {
       const pageId = rawParams.page_id as string;
       const markdown = rawParams.markdown as string;
       const clearExisting = rawParams.clear_existing !== false; // default true
+      const includeImages = rawParams.include_images !== undefined
+        ? Boolean(rawParams.include_images)
+        : config.includeImages;
 
       try {
         // Convert markdown to blocks first (for validation)
@@ -696,7 +907,7 @@ export function createNotionWritePageTool(params: {
                   `Before calling this tool again, you MUST:\n` +
                   `1. web_fetch https://alphaxiv.org/overview/{PAPER_ID}.md — structured overview\n` +
                   `2. web_fetch https://alphaxiv.org/abs/{PAPER_ID}.md — complete table data (every row/column) and full text\n` +
-                  `3. Search for figures: try arXiv HTML, GitHub repo (many papers have figures/ dir), or browser screenshots\n` +
+                  `3. Call extract_paper_figures with the arXiv ID to get figure URLs, then use browser screenshots for any missing figures\n` +
                   `4. Compose 3000-8000 words with: TL;DR, VERBATIM Abstract, VERBATIM Introduction, Background, Method (equations + figures), Experiments (complete data tables), Discussion, Key Takeaways, ALL References\n\n` +
                   `Current content has ${imageCount} images. Aim for 3-5 figures from the paper.`,
               },
@@ -704,9 +915,9 @@ export function createNotionWritePageTool(params: {
           };
         }
 
-        // Reject content with 0 images unless the paper genuinely has no figures
-        // Allow if markdown contains an explicit "no figures" declaration (case-insensitive)
-        if (imageCount === 0) {
+        // Reject content with 0 images unless images are disabled or paper has no figures
+        // Skip this gate entirely when includeImages is false
+        if (includeImages && imageCount === 0) {
           const mdLower = markdown.toLowerCase();
           const hasNoFiguresDeclaration =
             mdLower.includes("no figures") ||
@@ -728,11 +939,11 @@ export function createNotionWritePageTool(params: {
                   type: "text" as const,
                   text:
                     `REJECTED: Content has 0 images. Most research papers have figures — try to include them.\n\n` +
-                    `Image extraction fallback steps:\n` +
-                    `1. Try web_fetch the ar5iv HTML page and extract <img> src URLs\n` +
-                    `2. If ar5iv fails or has no images, try arxiv.org/html/{id} for HTML figures\n` +
-                    `3. If both fail, use the browser tool to open the PDF (https://arxiv.org/pdf/{id}) and take screenshots of each figure\n` +
-                    `4. For GitHub repos linked in the paper, check for figures in README or docs/\n\n` +
+                    `Image extraction steps:\n` +
+                    `1. Call extract_paper_figures with the arXiv ID — it programmatically fetches ar5iv/arXiv HTML and extracts validated figure URLs\n` +
+                    `2. If extract_paper_figures returns 0 figures, use the browser tool to open the PDF (https://arxiv.org/pdf/{id}) and take screenshots of each figure\n` +
+                    `3. For GitHub repos linked in the paper, check for figures in README or docs/\n\n` +
+                    `Do NOT try to manually parse HTML from web_fetch — web_fetch returns text, not raw HTML.\n\n` +
                     `After obtaining figure URLs, insert them as ![Figure N: caption](url) in your markdown and call this tool again.\n\n` +
                     `If the paper genuinely has no figures (e.g., pure theoretical/position paper), ` +
                     `add a note in the markdown like "> Note: This paper contains no figures." and call this tool again.`,
@@ -742,8 +953,10 @@ export function createNotionWritePageTool(params: {
           }
         }
 
-        // Validate image URLs — reject if broken or tiny fragments
-        const { broken: brokenImages, tooSmall } = await validateImageUrls(blocks);
+        // Validate image URLs — reject if broken or tiny fragments (skip when images disabled)
+        const { broken: brokenImages, tooSmall } = includeImages
+          ? await validateImageUrls(blocks)
+          : { broken: [], tooSmall: [] };
         if (brokenImages.length > 0) {
           const brokenList = brokenImages
             .map((b) => `  - ${b.url} → ${b.status}`)
@@ -846,10 +1059,17 @@ const NotionCreateChildPageSchema = {
       description:
         "Page content in Notion-flavored Markdown (same format as notion_write_page).",
     },
+    include_images: {
+      type: "boolean" as const,
+      description:
+        "Whether to require images in the child page. When false, image quality gates are skipped. " +
+        "Default: uses plugin config (true).",
+    },
   },
 };
 
 export function createNotionCreateChildPageTool(params: {
+  config: PaperCollectorConfig;
   notionToken: string;
   logger: {
     info: (msg: string) => void;
@@ -857,7 +1077,7 @@ export function createNotionCreateChildPageTool(params: {
     error: (msg: string) => void;
   };
 }) {
-  const { notionToken, logger } = params;
+  const { config, notionToken, logger } = params;
 
   return {
     name: "notion_create_child_page",
@@ -885,6 +1105,9 @@ export function createNotionCreateChildPageTool(params: {
       const title = rawParams.title as string;
       const icon = rawParams.icon as string | undefined;
       const markdown = rawParams.markdown as string;
+      const includeImages = rawParams.include_images !== undefined
+        ? Boolean(rawParams.include_images)
+        : config.includeImages;
 
       try {
         // Convert markdown to blocks first (for validation)
@@ -918,8 +1141,8 @@ export function createNotionCreateChildPageTool(params: {
         }
 
         // Reject child page with 0 images — must carry over images from English page
-        // Allow if markdown contains an explicit "no figures" declaration
-        if (imageCount === 0) {
+        // Skip when includeImages is false
+        if (includeImages && imageCount === 0) {
           const mdLower = markdown.toLowerCase();
           const hasNoFiguresDeclaration =
             mdLower.includes("no figures") ||
@@ -949,8 +1172,10 @@ export function createNotionCreateChildPageTool(params: {
           }
         }
 
-        // Validate image URLs — reject if broken or tiny fragments
-        const { broken: brokenImages, tooSmall } = await validateImageUrls(blocks);
+        // Validate image URLs — reject if broken or tiny fragments (skip when images disabled)
+        const { broken: brokenImages, tooSmall } = includeImages
+          ? await validateImageUrls(blocks)
+          : { broken: [], tooSmall: [] };
         if (brokenImages.length > 0) {
           const brokenList = brokenImages
             .map((b) => `  - ${b.url} → ${b.status}`)

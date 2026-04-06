@@ -6,9 +6,11 @@ import {
   createNotionBatchSaveTool,
   createNotionSetupTool,
   createExtractPageImagesTool,
+  createExtractPaperFiguresTool,
   createNotionWritePageTool,
   createNotionCreateChildPageTool,
 } from "./src/notion-tools.js";
+import { createGenerateSummaryTool } from "./src/api-mode-tools.js";
 
 function resolveNotionToken(): string {
   const keyFile = process.env.NOTION_API_TOKEN_FILE;
@@ -36,15 +38,29 @@ const plugin = {
       );
     }
 
+    // Core tools — always registered (both API mode and agent mode)
     api.registerTool(createNotionSavePaperTool({ config, notionToken, logger }));
     api.registerTool(createNotionBatchSaveTool({ config, notionToken, logger }));
     api.registerTool(createNotionSetupTool({ config, notionToken, logger }));
     api.registerTool(createExtractPageImagesTool({ logger }));
-    api.registerTool(createNotionWritePageTool({ notionToken, logger }));
-    api.registerTool(createNotionCreateChildPageTool({ notionToken, logger }));
+    api.registerTool(createExtractPaperFiguresTool({ logger }));
+    api.registerTool(createNotionWritePageTool({ config, notionToken, logger }));
+    api.registerTool(createNotionCreateChildPageTool({ config, notionToken, logger }));
+
+    // API mode: register the auto-generate tool that calls AI APIs directly
+    if (config.mode === "api") {
+      api.registerTool(createGenerateSummaryTool({ config, notionToken, logger }));
+      logger.info(
+        `Paper collector [API mode]: model=${config.model}, images=${config.includeImages}`,
+      );
+    } else {
+      logger.info(
+        `Paper collector [agent mode]: tools registered, agent handles generation`,
+      );
+    }
 
     logger.info(
-      `Paper collector active: databaseId=${config.databaseId || "(not set)"}`,
+      `Paper collector active: databaseId=${config.databaseId || "(not set)"}, mode=${config.mode}`,
     );
   },
 };

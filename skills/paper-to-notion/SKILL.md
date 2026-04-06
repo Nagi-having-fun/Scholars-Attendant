@@ -1,6 +1,6 @@
 ---
 name: paper-to-notion
-description: "Convert a research paper into a blog-style Notion page (Lilian Weng style). notion_write_page REJECTS content under 40 blocks — you MUST include VERBATIM abstract, VERBATIM introduction, complete tables (use markdown | pipe | syntax), figures, and ALL references. Compose 3000-8000 words. Also creates a Chinese translation sub-page with identical content and verbatim-translated abstract/introduction."
+description: "Convert a research paper into a blog-style Notion page (Lilian Weng style). IMPORTANT: Use extract_paper_figures tool to get figure URLs BEFORE writing — do NOT manually parse HTML. notion_write_page REJECTS content under 40 blocks or with 0 images. You MUST include VERBATIM abstract, VERBATIM introduction, complete tables, figures, and ALL references. Compose 3000-8000 words. Also creates a Chinese translation sub-page."
 ---
 
 # Paper to Notion — Blog-Style Paper Page
@@ -220,10 +220,10 @@ Follow this concrete fetch sequence:
 
 1. **`web_fetch` on `https://alphaxiv.org/overview/{PAPER_ID}.md`** — Get structured overview (abstract, contributions, methodology, results). This is your blog skeleton.
 2. **`web_fetch` on `https://alphaxiv.org/abs/{PAPER_ID}.md`** — Get the **full paper text** including **complete table data** (every row, every column, every number). This is essential — without it your tables will be incomplete or missing.
-3. **`web_fetch` on `https://arxiv.org/html/{PAPER_ID}`** — Get individual figure image URLs (look for `<img>` tags with `src` like `/html/{ID}/extracted/figures/*.png`). If 404, proceed to next source.
+3. **`extract_paper_figures` with `arxiv_id="{PAPER_ID}"`** — **USE THIS TOOL** to programmatically extract all figure image URLs from ar5iv and arXiv HTML pages. It automatically fetches raw HTML, parses `<img>` tags, validates image sizes (≥10KB), and returns only usable full-size figure URLs. Do NOT try to manually parse HTML with web_fetch — web_fetch returns text, not raw HTML, so you cannot see `<img>` tags.
 4. **`web_search` for `"{paper title}" github`** — Find the official repo. Many papers have high-quality figures at `github.com/{org}/{repo}/raw/main/figures/*.png`. Fetch the repo README to find figure URLs.
 5. **`web_fetch` on `https://arxiv.org/abs/{PAPER_ID}`** — Get metadata (authors, date, categories) if not already known.
-6. **PDF via `browser`** — **MANDATORY if steps 3+4 yielded fewer than 3 figures**:
+6. **PDF via `browser`** — **MANDATORY if `extract_paper_figures` returned fewer than 3 figures**:
    - `browser action=navigate url="https://arxiv.org/pdf/{PAPER_ID}"`
    - `browser action=screenshot` — capture page 1 (usually has main figure / architecture diagram)
    - `browser action=scroll_down` + `browser action=screenshot` — repeat for every page with a figure or table

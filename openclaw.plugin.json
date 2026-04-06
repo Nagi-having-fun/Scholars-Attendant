@@ -14,6 +14,22 @@
       "parentPageId": {
         "type": "string",
         "description": "Notion page ID under which to create the database (used by notion_setup)."
+      },
+      "mode": {
+        "type": "string",
+        "enum": ["api", "agent"],
+        "default": "agent",
+        "description": "Execution mode. 'api' calls AI APIs directly for summary generation. 'agent' relies on the hosting LLM agent."
+      },
+      "model": {
+        "type": "string",
+        "default": "claude-sonnet-4-6",
+        "description": "AI model for generating summaries in API mode. Supported: claude-opus-4-6, claude-sonnet-4-6, claude-haiku-4-5-20251001, gpt-5.4, gpt-4.1, gpt-4.1-mini, o3, o4-mini, gemini-2.5-pro, gemini-2.5-flash, gemini-2.0-flash, deepseek-chat, deepseek-reasoner."
+      },
+      "includeImages": {
+        "type": "boolean",
+        "default": true,
+        "description": "Whether to include figures in blog pages. When false, image quality gates are skipped."
       }
     }
   },
@@ -25,6 +41,18 @@
     "parentPageId": {
       "label": "Parent Page ID",
       "help": "The Notion page under which the database is created during setup."
+    },
+    "mode": {
+      "label": "Execution Mode",
+      "help": "'api' = plugin calls AI APIs directly (needs API key). 'agent' = hosting LLM generates content."
+    },
+    "model": {
+      "label": "AI Model",
+      "help": "Which model to use for summary generation in API mode."
+    },
+    "includeImages": {
+      "label": "Include Figures",
+      "help": "Whether blog pages include paper figures. Disable for faster processing."
     }
   }
 }

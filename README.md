@@ -1,183 +1,218 @@
-# Scholars-Attendant (Paper Collector)
+<p align="center">
+  <img src="docs/images/icon.png" width="120" alt="Scholars-Attendant Icon" />
+</p>
+
+<h1 align="center">Scholars-Attendant (书僮)</h1>
+
+<p align="center">
+  <em>Your research & scientific reading assistant — our loyal servant awaits your command, my liege.</em>
+</p>
+
+<p align="center">
+  <img src="docs/images/banner.png" alt="Scholars-Attendant Banner" />
+</p>
 
 An [OpenClaw](https://github.com/openclaw/openclaw) plugin that automatically detects research paper URLs, extracts structured metadata, and provides a full paper analysis pipeline — from quick saves to richly formatted Notion blog pages.
 
+## Showcase
+
+### Paper Archive in Notion
+
+Papers are automatically organized in a Notion database with metadata, tags, conference info, and reading priority:
+
+<p align="center">
+  <img src="docs/images/notion-archive.png" alt="Paper archive in Notion with metadata and reading status" />
+</p>
+
+### Generated Summary with Figures
+
+Each paper gets a comprehensive blog-style summary with TL;DR, verbatim abstract, method analysis with equations, key figures, and references:
+
+<p align="center">
+  <img src="docs/images/summary-with-figures.png" alt="Auto-generated paper summary with figures and equations" />
+</p>
+
+## Quick Start
+
+```bash
+# 1. Clone
+git clone https://github.com/Nagi-having-fun/Scholars-Attendant.git
+cd Scholars-Attendant
+
+# 2. Install (no build step needed — OpenClaw runs TypeScript via jiti)
+npm install --omit=dev
+
+# 3. Set your Notion API token
+export NOTION_API_TOKEN=ntn_your_token_here
+
+# 4. Register as an OpenClaw plugin
+openclaw plugin add ./path/to/Scholars-Attendant
+
+# 5. Create the Notion database (one-time setup)
+#    Share a Notion page with your integration first, then use notion_setup tool
+```
+
+### Docker Setup
+
+```yaml
+services:
+  openclaw:
+    environment:
+      NOTION_API_TOKEN: ${NOTION_API_TOKEN}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}  # Required for API mode
+    volumes:
+      - ./path/to/Scholars-Attendant:/app/extensions/paper-collector
+```
+
+### Standalone Usage (without OpenClaw)
+
+```typescript
+import { createExtractPaperFiguresTool } from "./src/notion-tools.js";
+
+// Extract validated figure URLs from any arXiv paper
+const tool = createExtractPaperFiguresTool({ logger: console });
+const result = await tool.execute("call-1", { arxiv_id: "2410.08827" });
+// Returns only figures ≥10KB, validated via HEAD request
+```
+
 ## Features
 
-- **Multi-platform URL detection**: Supports arXiv, Xiaohongshu, WeChat, X/Twitter, GitHub, and more
-- **Image-based paper inference**: When a page lacks text-based paper info (common on social media), the plugin analyzes images — paper screenshots, architecture diagrams, figure reproductions — to identify and search for the paper
-- **Structured metadata extraction**: Title, authors, institutions (multi-select tags), summary, contributions, tags
-- **AlphaXiv integration**: Fetch AI-generated structured overviews for arXiv papers — faster and more reliable than reading raw PDFs
-- **Formula & table parsing**: Extract equations with correct LaTeX formatting and numbering, plus tables with proper structure
-- **Figure extraction**: Collect paper figures with captions from arXiv HTML, PDF screenshots, or other sources
-- **Blog-style Notion pages**: Convert papers into richly formatted Notion pages with KaTeX equations, embedded figures, hyperlinked references, and toggle sections — modeled after [Lilian Weng's blog](https://lilianweng.github.io/)
-- **Chinese translation sub-pages**: Automatically creates a complete Chinese translation as a child page (same figures, tables, equations — not a summary)
-- **Quality gate enforcement**: `notion_write_page` and `notion_create_child_page` reject content under 25 blocks, forcing the agent to gather sufficient content before writing
-- **Progress reporting**: Sends status messages at each workflow step; never silently fails; reports detailed errors with fallback actions
-- **Notion integration**: Auto-saves to a Notion database with deduplication
-- **Multi-language support**: Handles Chinese/English content, always extracts English paper titles
+- **Multi-platform URL detection**: arXiv, Xiaohongshu, WeChat, X/Twitter, GitHub, and more
+- **Image-based paper inference**: Analyzes screenshots and diagrams to identify papers from social media
+- **Structured metadata extraction**: Title, authors, institutions, summary, contributions, tags
+- **AlphaXiv integration**: Fetch AI-generated structured overviews for arXiv papers
+- **Formula & table parsing**: LaTeX equations with correct formatting and tables with proper structure
+- **Figure extraction with validation**: ar5iv → arXiv HTML → PDF screenshots, with ≥10KB size validation
+- **Blog-style Notion pages**: KaTeX equations, embedded figures, tables, references (Lilian Weng style)
+- **Chinese translation sub-pages**: Full translation as child page (same figures, tables, equations)
+- **Quality gate enforcement**: Rejects content under 40 blocks or with broken/tiny images
+- **Dual execution mode**: API mode (AI API calls) or Agent mode (hosting LLM generates content)
+- **Model selection**: Choose from Anthropic, OpenAI, Google Gemini, or DeepSeek models
+- **Image toggle**: Generate summaries with or without figures
+
+## Execution Modes
+
+| Mode | Config | How It Works |
+|------|--------|-------------|
+| **Agent** (default) | `"mode": "agent"` | Hosting LLM agent generates content, calls tools |
+| **API** | `"mode": "api"` | Plugin calls AI APIs directly via `generate_paper_summary` |
+
+### Model Selection
+
+Both modes support configurable model selection:
+
+```json
+{
+  "mode": "api",
+  "model": "claude-sonnet-4-6",
+  "includeImages": true
+}
+```
+
+**Available models:**
+
+| Provider | Models |
+|----------|--------|
+| Anthropic | `claude-opus-4-6`, `claude-sonnet-4-6`, `claude-haiku-4-5-20251001` |
+| OpenAI | `gpt-5.4`, `gpt-4.1`, `gpt-4.1-mini`, `o3`, `o4-mini` |
+| Google | `gemini-2.5-pro`, `gemini-2.5-flash`, `gemini-2.0-flash` |
+| DeepSeek | `deepseek-chat`, `deepseek-reasoner` |
+
+### Image Toggle
+
+Set `"includeImages": false` to skip figure extraction and generate text-only summaries (faster processing).
 
 ## Skills
 
-The plugin provides 5 AI skills that work together as a paper analysis pipeline:
-
 | Skill | Description |
 |-------|-------------|
-| **paper-collector** | Core workflow: detect paper URLs, extract metadata, save to Notion. Triggers automatically on URLs. |
-| **alphaxiv-lookup** | Fetch structured AI-generated paper overviews from alphaxiv.org. Preferred first step before parsing PDFs. |
-| **paper-parse** | Extract formulas, symbols, and tables with correct LaTeX formatting and numbering. Two methods: PDF text extraction and image-based visual parsing. |
-| **paper-figures** | Extract and save paper figures with captions. Sources: arXiv HTML, PDF browser screenshots, Semantic Scholar. |
-| **paper-to-notion** | Convert a paper into a blog-style Notion page with KaTeX equations, embedded figures, Notion tables, hyperlinked citations, toggle proofs, and callout highlights. |
+| **paper-collector** | Core workflow: detect paper URLs, extract metadata, save to Notion |
+| **alphaxiv-lookup** | Fetch structured AI-generated paper overviews from alphaxiv.org |
+| **paper-parse** | Extract formulas, symbols, and tables with correct LaTeX formatting |
+| **paper-figures** | Extract and validate paper figures with multi-source fallback |
+| **paper-to-notion** | Convert paper into blog-style Notion page + Chinese translation |
 
-### Typical Workflow
+### Workflow
 
 ```
-User sends a paper URL (Discord / Telegram / Web)
+User sends a paper URL
         │
         ▼
   paper-collector          ← Auto-detect, extract metadata, save to Notion DB
-        │                     📄 "Processing paper link..."
-        │                     ✅ "Metadata saved. Generating blog summary..."
+        │
         ▼
-  Gather content           ← AlphaXiv overview + full text + arXiv HTML + GitHub figures
-        │                     🔍 "Gathering content from AlphaXiv, arXiv, GitHub..."
+  extract_paper_figures    ← Validate figure URLs (≥10KB, reachable)
+        │                     Fallback: PDF browser screenshots
         ▼
-  notion_write_page        ← English blog page (2000-5000 words, ≥25 blocks required)
-        │                     ✅ "English page: 108 blocks, 5 figures"
+  notion_write_page        ← English blog page (≥40 blocks, validated images)
+        │                     TL;DR, verbatim abstract, method, results, references
         ▼
   notion_create_child_page ← Chinese translation (full mirror, NOT a summary)
-        │                     ✅ "Chinese page: 102 blocks"
+        │
         ▼
   Reply to user            ← Title, authors, Notion link, stats
-                              ❌ On failure: detailed error + fallback actions
 ```
-
-## Supported Platforms
-
-- arXiv
-- Xiaohongshu (小红书)
-- WeChat articles (微信公众号)
-- X / Twitter
-- GitHub
-- Google Scholar, Semantic Scholar, PapersWithCode, HuggingFace
-- Academic conference sites (NeurIPS, ICML, ICLR, ACL, CVPR, AAAI, etc.)
-- Any URL containing research paper references
-
-## How It Works
-
-1. User sends a URL in a message (Discord, Telegram, or web UI)
-2. Plugin fetches and evaluates the content via `web_fetch`
-3. If text content is insufficient (blocked by anti-scraping, login walls, etc.):
-   - Falls back to browser screenshots
-   - **Extracts and analyzes page images** (og:image, embedded figures, etc.) to identify paper clues
-   - Uses visual clues (paper titles in screenshots, architecture diagrams, figure captions, arXiv IDs) to search for the paper
-4. Extracts structured metadata (title, authors, institutions, summary, tags, etc.)
-5. Saves to Notion database with duplicate checking
-6. **Auto-generates blog-style English Notion page** (2000-5000 words) with figures, tables, equations, and references
-7. **Auto-generates Chinese translation sub-page** — a full mirror with identical figures, tables, and equations
-8. Reports progress at every step; reports failures with detailed reasons and fallback actions
-
-### Image-Based Inference Flow
-
-Many social media posts (Xiaohongshu, WeChat, X) discuss papers primarily through images rather than text. The plugin handles this by:
-
-1. **Extracting images** from HTML via `extract_page_images` tool (parses `og:image`, `<img src>`, `data-src`)
-2. **Visually analyzing** each image for paper identifiers:
-   - Paper titles visible in screenshots
-   - arXiv IDs (e.g., `arXiv:2301.12345`)
-   - Architecture/method names in diagrams
-   - Author names, conference badges, DOIs
-   - Figure captions and table headers
-3. **Searching** with extracted clues via `web_search`
-4. **Verifying** by fetching the actual paper page for accurate metadata
-
-### Paper-to-Notion Blog Format
-
-The `paper-to-notion` skill creates Notion pages with:
-
-- **Table of Contents** for navigation
-- **TL;DR** — one-sentence key contribution
-- **Background** — context and motivation with notation
-- **Method** — detailed methodology with numbered equations and architecture figures
-- **Experiments** — results tables and analysis
-- **Key Takeaways** — bulleted summary
-- **References** — numbered list with hyperlinks to arXiv/DOI
-- **Toggle sections** for lengthy proofs and derivations
-- **Callout blocks** for key insights and warnings
-
-## Setup
-
-### 1. Create a Notion Integration
-
-1. Go to [https://www.notion.so/my-integrations](https://www.notion.so/my-integrations)
-2. Create a new internal integration
-3. Copy the **Internal Integration Secret**
-
-### 2. Configure Environment
-
-```bash
-export NOTION_API_TOKEN=your_token_here
-```
-
-Or for Docker deployments, add to your `.env`:
-
-```bash
-NOTION_API_TOKEN=ntn_your_token_here
-```
-
-### 3. Create the Database
-
-Use the `notion_setup` tool with a `parent_page_id` to create the Paper Collection database in Notion. Make sure to share the parent page with your integration first.
-
-### 4. Install as OpenClaw Plugin
-
-Add this plugin to your OpenClaw configuration and set the `databaseId` in the plugin config.
 
 ## Tools
 
 | Tool | Description |
 |------|-------------|
-| `notion_save_paper` | Save a paper's structured metadata to the Notion database |
-| `notion_setup` | One-time setup: create the Paper Collection database in Notion |
-| `extract_page_images` | Extract image URLs from HTML for visual paper identification |
-| `notion_write_page` | Write blog-style content to a Notion page (quality gate: rejects < 25 blocks) |
-| `notion_create_child_page` | Create a child page (e.g., Chinese translation) under an existing page (quality gate: rejects < 25 blocks) |
+| `notion_save_paper` | Save paper metadata to Notion |
+| `notion_batch_save` | Batch save with deduplication and rate limiting |
+| `notion_setup` | One-time database creation |
+| `extract_page_images` | Extract image URLs from HTML |
+| `extract_paper_figures` | Validate figure URLs from ar5iv/arXiv HTML (≥10KB) |
+| `notion_write_page` | Write blog content with quality gates |
+| `notion_create_child_page` | Create Chinese translation sub-page |
+| `generate_paper_summary` | **(API mode only)** One-step: fetch → generate → write |
 
 ## Notion Database Schema
 
-| Property      | Type         | Description                                    |
-|---------------|--------------|------------------------------------------------|
-| Title         | Title        | Paper title                                    |
-| Authors       | Rich Text    | Comma-separated author names                   |
-| Institution   | Multi-select | First author & corresponding author affiliations (e.g., MIT, Stanford) |
-| Published     | Date         | Publication date                               |
-| Source URL    | URL          | Original URL shared by user                    |
-| Paper URL     | URL          | Direct link to paper (arXiv, DOI)              |
-| Summary       | Rich Text    | One-sentence summary                           |
-| Contributions | Rich Text    | Main contributions (2-3 sentences)             |
-| Tags          | Multi-select | Research area tags (English)                   |
-| Status        | Select       | Unread / Reading / Read                        |
+| Property | Type | Description |
+|----------|------|-------------|
+| Title | Title | Paper title |
+| Authors | Rich Text | Author names |
+| Institution | Multi-select | Author affiliations |
+| Published | Date | Publication date |
+| Source URL | URL | Original URL |
+| Paper URL | URL | arXiv/DOI link |
+| Summary | Rich Text | One-sentence summary |
+| Contributions | Rich Text | Main contributions |
+| Tags | Multi-select | Research area tags |
+| Conference | Select | Venue with year |
+| Status | Select | Unread / Reading / Read |
+| Notes (备注) | Rich Text | Personal reading notes |
 
 ## Project Structure
 
 ```
-├── index.ts                  # Plugin entry point
-├── openclaw.plugin.json      # Plugin manifest
+├── index.ts                  # Plugin entry point — registers tools by mode
+├── openclaw.plugin.json      # Plugin manifest with config schema
 ├── package.json
+├── docs/images/              # README images
 ├── src/
 │   ├── config.ts             # Configuration parser
-│   ├── types.ts              # TypeScript type definitions
-│   ├── notion-client.ts      # Notion API client (CRUD, batch append, child pages)
-│   ├── notion-tools.ts       # Tool definitions (save_paper, setup, extract_images, write_page, create_child_page)
-│   ├── markdown-to-blocks.ts # Markdown → Notion block converter (headings, equations, images, tables, callouts)
-│   └── image-extract.ts      # HTML image URL extraction utilities
+│   ├── types.ts              # Types + AVAILABLE_MODELS registry
+│   ├── ai-client.ts          # Multi-provider AI API client
+│   ├── api-mode-tools.ts     # API mode: generate_paper_summary tool
+│   ├── notion-client.ts      # Notion API wrapper
+│   ├── notion-tools.ts       # Core tool definitions with quality gates
+│   ├── markdown-to-blocks.ts # Markdown → Notion block converter
+│   └── image-extract.ts      # HTML image URL extraction
 └── skills/
-    ├── paper-collector/      # Core: URL detection, metadata extraction, Notion save
-    ├── alphaxiv-lookup/      # AlphaXiv structured paper overview
-    ├── paper-parse/          # Formula, symbol & table extraction
-    ├── paper-figures/        # Figure extraction & saving
+    ├── paper-collector/      # URL detection + metadata extraction
+    ├── alphaxiv-lookup/      # AlphaXiv paper overview
+    ├── paper-parse/          # Formula & table extraction
+    ├── paper-figures/        # Figure extraction + validation
     └── paper-to-notion/      # Blog-style Notion page generation
 ```
+
+## Requirements
+
+- Node.js 22+ or Bun
+- [OpenClaw](https://github.com/openclaw/openclaw) (for plugin mode)
+- [Notion integration token](https://www.notion.so/my-integrations)
+- AI API key (for API mode): Anthropic, OpenAI, Google, or DeepSeek
 
 ## License
 
